@@ -1,0 +1,23 @@
+import {
+  "wantJoy1/patchbay/app",
+  "wantJoy1/patchbay/mock",
+  "wantJoy1/patchbay/nushell",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "native"
+
+options(
+  "native-stub": [ "host.m" ],
+  link: { "native": { "cc-link-flags": "-framework Cocoa -framework WebKit" } },
+  "pre-build": [
+    {
+      "input": "page.html",
+      "output": "page.mbt",
+      "command": ":embed -i $input -o $output --name page_html",
+    },
+  ],
+)
