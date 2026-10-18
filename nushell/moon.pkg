@@ -1,15 +1,10 @@
 import {
   "wantJoy1/patchbay/program",
+  "moonbitlang/async",
+  "moonbitlang/async/process",
   "moonbitlang/core/json",
-  "moonbitlang/core/encoding/utf8",
 }
 
-supported_targets = "native"
-
 import {
-  "wantJoy1/patchbay/program",
+  "moonbitlang/async",
 } for "test"
-
-options(
-  "native-stub": [ "process.c" ],
-)

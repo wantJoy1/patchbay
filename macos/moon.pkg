@@ -1,5 +1,9 @@
 import {
   "wantJoy1/patchbay/app",
+  "wantJoy1/patchbay/program",
+  "moonbitlang/async",
+  "moonbitlang/async/cond_var",
+  "moonbitlang/async/external_loop_integration",
   "wantJoy1/patchbay/mock",
   "wantJoy1/patchbay/nushell",
   "moonbitlang/core/json",

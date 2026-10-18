@@ -114,11 +114,16 @@ fn App::render_entry(self : App, i : Int, entry : Entry) -> String {
   let attachments = entry.input.attachments.map(a => {
     "<span class=\"chip\">\{escape_html(a.name)}</span>"
   })
+  let running = if entry.running {
+    "<div class=\"running\">実行中…\{self.button("中断", Cancel(i), class="small")}</div>"
+  } else {
+    ""
+  }
   let steps = entry.steps.map(step => {
     let name = escape_html(self.programs[step.program].name)
     "<div class=\"step\"><div class=\"said\"><span class=\"who\">AI → \{name}</span>\{code(step.input.text)}</div>\{self.render_reply(step)}</div>"
   })
-  let markdown = entry.reply.parts.filter_map(p => {
+  let markdown = entry.parts.filter_map(p => {
     if p is Markdown(md) {
       Some(md)
     } else {
@@ -136,14 +141,14 @@ fn App::render_entry(self : App, i : Int, entry : Entry) -> String {
   }
   (
     $|<section class="entry" data-key="e\{i}"><div class="said"><span class="who">\{escape_html(program.name)}</span>
-    $|\{said}\{attachments.join("")}</div>\{steps.join("")}\{self.render_reply(entry)}\{tools}</section>
+    $|\{said}\{attachments.join("")}</div>\{steps.join("")}\{self.render_reply(entry)}\{running}\{tools}</section>
   )
 }
 
 ///|
 fn App::render_reply(self : App, entry : Entry) -> String {
-  // Why only for `nu`: a view transform is written in that language, so only
-  // there can it be appended to the input.
+  // Why not for every interpreter: a view transform is written in nu, so only
+  // a nu input can take it in.
   let adopt = if self.programs[entry.program].kind is Interpreter(language="nu") &&
     entry.input.text != "" {
     Some(entry.input.text)
@@ -151,7 +156,7 @@ fn App::render_reply(self : App, entry : Entry) -> String {
     None
   }
   let blocks = entry.blocks.map(b => self.render_block(b, adopt))
-  blocks.join("") + entry.reply.error.map(error_html).unwrap_or("")
+  blocks.join("") + entry.error.map(error_html).unwrap_or("")
 }
 
 ///|

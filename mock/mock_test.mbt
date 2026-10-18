@@ -1,21 +1,25 @@
 ///|
-let alone : @program.Session = {
-  unseen: [],
-  programs: [],
-  run: (_, _) => abort("no programs"),
-}
-
-///|
-fn ask(
+async fn ask(
   agent : @program.Program,
   text : String,
-  session? : @program.Session = alone,
+  unseen? : Array[@program.Exchange] = [],
+  programs? : Array[(String, @program.Kind)] = [],
+  run? : async (String, @program.Input) -> @program.Reply = (_, _) => {
+    abort("no programs")
+  },
 ) -> Array[@program.Part] {
-  (agent.send)({ text, attachments: [], }, session).parts
+  let parts = []
+  (agent.send)({ text, attachments: [], }, {
+    unseen,
+    programs,
+    emit: p => parts.push(p),
+    run,
+  })
+  parts
 }
 
 ///|
-test "the agent mock answers in the kinds asked for and counts turns" {
+async test "the agent mock answers in the kinds asked for and counts turns" {
   let agent = @mock.agent()
   assert_true(
     ask(agent, "表と図と画像") is [Markdown(_), Markdown(_), Image(_)],
@@ -30,7 +34,7 @@ test "the agent mock answers in the kinds asked for and counts turns" {
 }
 
 ///|
-test "the agent mock reports what it has not seen" {
+async test "the agent mock reports what it has not seen" {
   let unseen : Array[@program.Exchange] = [
     {
       program: "nu",
@@ -38,22 +42,22 @@ test "the agent mock reports what it has not seen" {
       reply: { parts: [Data([1, 2])], error: None, },
     },
   ]
-  let parts = ask(@mock.agent(), "", session={ ..alone, unseen, })
+  let parts = ask(@mock.agent(), "", unseen~)
   assert_true(parts is [Markdown(md)] && md.contains("| nu | `ls` | 2 行 |"))
 }
 
 ///|
-test "the agent mock runs code spans on an interpreter" {
+async test "the agent mock runs code spans on an interpreter" {
   let ran = []
-  let session : @program.Session = {
-    unseen: [],
-    programs: [("nu", Interpreter(language="nu"))],
-    run: (name, input) => {
+  let parts = ask(
+    @mock.agent(),
+    "`ls` と `pwd` を見て",
+    programs=[("nu", Interpreter(language="nu"))],
+    run=(name, input) => {
       ran.push((name, input.text))
       { parts: [Text("ok")], error: None, }
     },
-  }
-  let parts = ask(@mock.agent(), "`ls` と `pwd` を見て", session~)
+  )
   assert_eq(ran, [("nu", "ls"), ("nu", "pwd")])
   assert_eq(parts.length(), 2)
 }

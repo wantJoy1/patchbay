@@ -6,12 +6,17 @@ pub fn agent() -> @program.Program {
     kind: Agent,
     send: (input, session) => {
       turn += 1
-      let parts : Array[@program.Part] = []
+      let emit = session.emit
+      let mut said = false
+      let say = part => {
+        said = true
+        emit(part)
+      }
       if !session.unseen.is_empty() {
-        parts.push(Markdown(describe_unseen(session.unseen)))
+        say(Markdown(describe_unseen(session.unseen)))
       }
       if !input.attachments.is_empty() {
-        parts.push(Markdown(describe_attachments(input.attachments)))
+        say(Markdown(describe_attachments(input.attachments)))
       }
       if session.programs.iter().find_first(p => p.1 is Interpreter(_))
         is Some((shell, _)) {
@@ -21,7 +26,7 @@ pub fn agent() -> @program.Program {
             text: code.to_owned(),
             attachments: [],
           })
-          parts.push(
+          say(
             Markdown(
               "`\{code}` を \{shell} で実行しました（\{summary(reply)}）。",
             ),
@@ -31,13 +36,12 @@ pub fn agent() -> @program.Program {
       let lower = input.text.to_lower()
       for r in replies {
         if r.0.iter().any(w => lower.contains(w)) {
-          parts.push((r.1)())
+          say((r.1)())
         }
       }
-      if parts.is_empty() {
-        parts.push(Markdown(help_reply(turn)))
+      if !said {
+        emit(Markdown(help_reply(turn)))
       }
-      { parts, error: None, }
     },
   }
 }

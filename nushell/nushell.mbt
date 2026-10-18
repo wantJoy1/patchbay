@@ -1,25 +1,23 @@
 ///|
-#borrow(args)
-extern "C" fn spawn(args : Bytes) -> Int = "patchbay_spawn"
-
-///|
-#borrow(line)
-extern "C" fn write_line(process : Int, line : Bytes) -> Unit = "patchbay_write_line"
-
-///|
-extern "C" fn read_line(process : Int) -> Bytes = "patchbay_read_line"
-
-///|
-extern "C" fn at_eof(process : Int) -> Bool = "patchbay_at_eof"
-
-///|
 /// Why not `nu -c` per input: each run would start from scratch, losing
 /// variables and the working directory. The MCP server keeps one session.
-pub fn nushell() -> @program.Program {
-  let process = spawn(@utf8.encode("nu\u{0}--mcp"))
+pub async fn nushell(group : @async.TaskGroup[Unit]) -> @program.Program {
+  let (stdin, to_nu) = @process.write_to_process()
+  let (from_nu, stdout) = @process.read_from_process()
+  @process.spawn(
+    group,
+    "nu",
+    ["--mcp"],
+    stdin~,
+    stdout~,
+    stderr=@process.redirect_to_file("/dev/null"),
+    no_wait=true,
+  )
+  |> ignore
   let mut id = 0
-  // Lines that are not the response are what external commands printed.
-  let call = (name : String, params : Json) => {
+  // Why not drop lines that are not responses: they are what external
+  // commands printed.
+  async fn call(name : String, params : Json) -> (Json, Array[String]) {
     id += 1
     let request : Json = {
       "jsonrpc": "2.0",
@@ -27,72 +25,71 @@ pub fn nushell() -> @program.Program {
       "method": name.to_json(),
       "params": params,
     }
-    write_line(process, @utf8.encode(request.stringify()))
-    let printed : Array[String] = []
-    while true {
-      let line = @utf8.decode_lossy(read_line(process))
-      if at_eof(process) {
-        break
-      }
+    to_nu.write(request.stringify() + "\n")
+    let printed = []
+    while from_nu.read_until("\n") is Some(line) {
       match (@json.parse(line) catch { _ => null }) {
         { "id": Number(n, ..), "result": result, .. } if n == id.to_double() =>
-          return (Some(result), printed)
+          return (result, printed)
+        // Why not treat every line as printed: a response to a cancelled
+        // request may still arrive.
+        { "jsonrpc": _, .. } => ()
         _ => printed.push(line)
       }
     }
-    (None, printed)
+    raise @program.Failure("nu が終了しました")
   }
-  let evaluate = (code : String) => {
+  async fn evaluate(code : String) -> (Json, Array[String]) {
+    let current = id + 1
+    errdefer (if @async.is_being_cancelled() {
+      @async.protect_from_cancel(() => {
+        let notice : Json = {
+          "jsonrpc": "2.0",
+          "method": "notifications/cancelled",
+          "params": { "requestId": current.to_json() },
+        }
+        to_nu.write(notice.stringify() + "\n")
+      })
+    })
     call("tools/call", {
       "name": "evaluate",
       "arguments": { "input": code.to_json() },
     })
   }
-  if process >= 0 {
-    call("initialize", {
-      "protocolVersion": "2025-06-18",
-      "capabilities": {},
-      "clientInfo": { "name": "patchbay", "version": "0.1.0" },
-    })
-    |> ignore
-    // Why not keep the default limit: larger outputs come back as a note
-    // instead of data.
-    evaluate("$env.NU_MCP_OUTPUT_LIMIT = 1gb") |> ignore
-  }
+
+  call("initialize", {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {},
+    "clientInfo": { "name": "patchbay", "version": "0.1.0" },
+  })
+  |> ignore
+  // Why not keep the default limit: larger outputs come back as a note
+  // instead of data.
+  evaluate("$env.NU_MCP_OUTPUT_LIMIT = 1gb") |> ignore
+  let lock = @async.Mutex()
   {
     name: "Nushell",
     kind: Interpreter(language="nu"),
-    send: (input, _) => {
-      if process < 0 {
-        return { parts: [], error: Some("nu を起動できません"), }
+    send: (input, session) => {
+      guard input.attachments.is_empty() else {
+        raise @program.Failure("Nushell には添付を渡せません")
       }
-      if !input.attachments.is_empty() {
-        return {
-          parts: [],
-          error: Some("Nushell には添付を渡せません"),
-        }
-      }
+      lock.acquire()
+      defer lock.release()
       let (result, printed) = evaluate(input.text)
-      let parts : Array[@program.Part] = if printed.is_empty() {
-        []
-      } else {
-        [Text(printed.join("\n"))]
+      if !printed.is_empty() {
+        (session.emit)(Text(printed.join("\n")))
       }
       match result {
-        Some(
-          {
-            "isError": True,
-            "structuredContent": { "msg": String(msg), .. },
-            ..
-          }
-        ) => { parts, error: Some(msg), }
-        Some({ "structuredContent": { "output": String(s), .. }, .. }) =>
-          { parts: [..parts, Text(s)], error: None, }
-        Some({ "structuredContent": { "output": v, .. }, .. }) =>
-          { parts: [..parts, Data(v)], error: None, }
-        Some({ "structuredContent": { "note": String(note), .. }, .. }) =>
-          { parts, error: Some(note), }
-        _ => { parts, error: Some("nu が応答しません"), }
+        { "isError": True, "structuredContent": { "msg": String(msg), .. }, .. } =>
+          raise @program.Failure(msg)
+        { "structuredContent": { "output": String(s), .. }, .. } =>
+          (session.emit)(Text(s))
+        { "structuredContent": { "output": v, .. }, .. } =>
+          (session.emit)(Data(v))
+        { "structuredContent": { "note": String(note), .. }, .. } =>
+          raise @program.Failure(note)
+        _ => raise @program.Failure("nu の応答を解釈できません")
       }
     },
   }

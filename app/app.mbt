@@ -22,15 +22,38 @@ pub(all) enum UiAction {
   UseInput(String)
   Send(String)
   RemoveAttachment(Int)
+  Cancel(Int)
 } derive(Eq, Debug)
 
 ///|
 priv struct Entry {
   program : Int
   input : @program.Input
-  reply : @program.Reply
+  parts : Array[@program.Part]
+  mut error : String?
   blocks : Array[Int]
   steps : Array[Entry]
+  mut running : Bool
+  mut cancel : () -> Unit
+}
+
+///|
+fn Entry::new(program : Int, input : @program.Input) -> Entry {
+  {
+    program,
+    input,
+    parts: [],
+    error: None,
+    blocks: [],
+    steps: [],
+    running: true,
+    cancel: () => (),
+  }
+}
+
+///|
+fn Entry::reply(self : Entry) -> @program.Reply {
+  { parts: self.parts, error: self.error, }
 }
 
 ///|
@@ -54,11 +77,19 @@ pub struct App {
   priv actions : Map[String, UiAction]
   priv mut scope : String
   priv mut next_act : Int
+  priv spawn : (async () -> Unit) -> () -> Unit
+  priv changed : (Frame) -> Unit
 }
 
 ///|
-pub fn App::new(programs : Array[@program.Program]) -> App {
+pub fn App::new(
+  programs : Array[@program.Program],
+  spawn~ : (async () -> Unit) -> () -> Unit,
+  changed~ : (Frame) -> Unit,
+) -> App {
   {
+    spawn,
+    changed,
     programs,
     current: 0,
     entries: [],
@@ -92,7 +123,9 @@ fn App::send(self : App, text : String) -> Unit {
   } else {
     []
   }
-  self.entries.push(self.run(self.current, input, unseen))
+  let entry = Entry::new(self.current, input)
+  self.entries.push(entry)
+  entry.cancel = (self.spawn)(() => self.run(entry, unseen))
   if text != "" && self.history.last() != Some((self.current, text)) {
     self.history.push((self.current, text))
   }
@@ -103,36 +136,38 @@ fn App::send(self : App, text : String) -> Unit {
 }
 
 ///|
-/// The programs an agent runs become steps of its entry, drawn like any other
-/// output.
-fn App::run(
+async fn App::run(
   self : App,
-  p : Int,
-  input : @program.Input,
+  entry : Entry,
   unseen : Array[@program.Exchange],
-) -> Entry {
-  let steps = []
+) -> Unit {
   let session : @program.Session = {
     unseen,
     programs: self.programs.map(q => (q.name, q.kind)),
+    emit: part => {
+      entry.parts.push(part)
+      for block in blocks_of(part) {
+        entry.blocks.push(self.blocks.length())
+        self.blocks.push(block)
+      }
+      (self.changed)(self.frame())
+    },
     run: (name, input) => {
       guard self.programs.search_by(q => q.name == name) is Some(q) else {
         return { parts: [], error: Some("unknown program: \{name}"), }
       }
-      let step = self.run(q, input, [])
-      steps.push(step)
-      step.reply
+      let step = Entry::new(q, input)
+      entry.steps.push(step)
+      self.run(step, [])
+      step.reply()
     },
   }
-  let reply = (self.programs[p].send)(input, session)
-  let blocks = []
-  for part in reply.parts {
-    for block in blocks_of(part) {
-      blocks.push(self.blocks.length())
-      self.blocks.push(block)
-    }
+  (self.programs[entry.program].send)(entry.input, session) catch {
+    @program.Failure(msg) => entry.error = Some(msg)
+    e => if entry.error is None { entry.error = Some(e.to_string()) }
   }
-  { program: p, input, reply, blocks, steps, }
+  entry.running = false
+  (self.changed)(self.frame())
 }
 
 ///|
@@ -145,10 +180,11 @@ fn App::unseen_by(self : App, p : Int) -> Array[@program.Exchange] {
   }
   self.entries[since:]
   .iter()
+  .filter(e => !e.running)
   .map(e => @program.Exchange::{
     program: self.programs[e.program].name,
     input: e.input,
-    reply: e.reply,
+    reply: e.reply(),
   })
   .collect()
 }
@@ -243,5 +279,11 @@ fn App::dispatch(self : App, id : String, shift~ : Bool) -> Unit {
     UseInput(text) => self.next_input = Some(text)
     Send(text) => self.send(text)
     RemoveAttachment(i) => self.pending.remove(i) |> ignore
+    Cancel(i) =>
+      if self.entries.get(i) is Some({ running: true, .. } as entry) {
+        entry.error = Some("中断しました")
+        entry.running = false
+        (entry.cancel)()
+      }
   }
 }

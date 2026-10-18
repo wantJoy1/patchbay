@@ -50,12 +50,20 @@ pub(all) struct Exchange {
 } derive(Eq, Debug)
 
 ///|
-/// Why not give a program only its own input: an agent works on the same
-/// programs as the human, so it must see their exchanges and run them itself.
+pub(all) suberror Failure {
+  Failure(String)
+} derive(Debug)
+
+///|
+/// Why not return the parts at the end: agents and long commands produce
+/// output over time, and it should be drawn as it comes. Why not give a
+/// program only its own input: an agent works on the same programs as the
+/// human, so it must see their exchanges and run them itself.
 pub(all) struct Session {
   unseen : Array[Exchange]
   programs : Array[(String, Kind)]
-  run : (String, Input) -> Reply
+  emit : (Part) -> Unit
+  run : async (String, Input) -> Reply
 }
 
 ///|
@@ -64,5 +72,5 @@ pub(all) struct Session {
 pub(all) struct Program {
   name : String
   kind : Kind
-  send : (Input, Session) -> Reply
+  send : async (Input, Session) -> Unit
 }

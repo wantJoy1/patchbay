@@ -26,8 +26,6 @@ pub(all) struct Frame {
 
 ///|
 pub fn App::handle(self : App, request : Request) -> Frame {
-  self.notice = ""
-  self.clipboard = ""
   match request {
     Send(text~) => self.send(text)
     Act(id~, shift~) => self.dispatch(id, shift~)
@@ -43,6 +41,13 @@ pub fn App::handle(self : App, request : Request) -> Frame {
     Escape => self.menu = None
     Init | Open(_) => ()
   }
+  self.frame()
+}
+
+///|
+/// Why not keep the clipboard, notice, input and scroll in later frames: each
+/// is to be acted on once.
+fn App::frame(self : App) -> Frame {
   let (html, controls) = self.render()
   let frame = {
     html,
@@ -55,5 +60,7 @@ pub fn App::handle(self : App, request : Request) -> Frame {
   }
   self.next_input = None
   self.scroll_to_end = false
+  self.clipboard = ""
+  self.notice = ""
   frame
 }
