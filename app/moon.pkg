@@ -4,13 +4,13 @@ import {
   "wantJoy1/patchbay/program",
   "wantJoy1/patchbay/markdown",
   "wantJoy1/patchbay/mermaid",
-  "moonbitlang/core/cmp",
+  "wantJoy1/patchbay/html",
   "moonbitlang/core/json",
+  "moonbitlang/async",
 }
 
 import {
   "wantJoy1/patchbay/mock",
   "wantJoy1/patchbay/fixture",
   "moonbitlang/core/debug",
-  "moonbitlang/async",
 } for "wbtest"

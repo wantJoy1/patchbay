@@ -22,12 +22,6 @@ pub fn field(v : Json, name : String) -> Json? {
 }
 
 ///|
-pub fn index(v : Json, i : Int32) -> Json? {
-  guard v is Array(items) else { return None }
-  items.get(if i < 0 { items.length() + i } else { i })
-}
-
-///|
 pub fn columns(rows : Array[Json]) -> Array[String]? {
   guard !rows.is_empty() else { return None }
   let columns = []
@@ -74,7 +68,7 @@ fn[T] compare_lists(
   ys : Array[T],
   cmp : (T, T) -> Int32,
 ) -> Int32 {
-  for i in 0..<@cmp.minimum(xs.length(), ys.length()) {
+  for i in 0..<xs.length().min(ys.length()) {
     let c = cmp(xs[i], ys[i])
     if c != 0 {
       return c
@@ -93,15 +87,26 @@ pub fn cell_text(v : Json) -> String {
 }
 
 ///|
+/// Why not `cell_text` for nested values: a value copied on its own is read
+/// by people, so it is indented.
+pub fn value_text(v : Json) -> String {
+  if is_scalar(v) {
+    cell_text(v)
+  } else {
+    v.stringify(indent=2)
+  }
+}
+
+///|
 pub fn summary(v : Json) -> String {
   match v {
     Array([_]) => "[1 item]"
     Array(items) => "[\{items.length()} items]"
     Object(fields) => {
       let names = fields.keys().collect()
-      let shown = names.length() > 4
-      let names = if shown { names[:4].to_owned() } else { names }
-      "{\{names.join(", ")}\{if shown { ", …" } else { "" }}}"
+      let cut = names.length() > 4
+      let names = if cut { names[:4].to_owned() } else { names }
+      "{\{names.join(", ")}\{if cut { ", …" } else { "" }}}"
     }
     _ => cell_text(v)
   }

@@ -28,8 +28,7 @@ extern "C" fn open_url(url : Bytes) -> Unit = "patchbay_open_url"
 
 ///|
 priv struct Cocoa {
-  messages : Array[Bytes]
-  arrived : @cond_var.Cond
+  messages : @aqueue.Queue[Bytes]
 }
 
 ///|
@@ -39,10 +38,7 @@ impl @external_loop_integration.ExternalEventLoop for Cocoa with fn poll(
 ) {
   poll_cocoa(timeout.unwrap_or(-1))
   while has_message() {
-    self.messages.push(take_message())
-  }
-  if !self.messages.is_empty() {
-    self.arrived.signal()
+    self.messages.try_put(take_message()) |> ignore
   }
 }
 
@@ -67,10 +63,11 @@ fn show_frame(frame : @app.Frame) -> Unit {
 }
 
 ///|
-fn unavailable(name : String, error : Error) -> @program.Program {
+fn unavailable_nushell(error : Error) -> @program.Program {
+  let name = "Nushell"
   {
     name,
-    kind: Agent,
+    kind: Interpreter(language="nu"),
     send: (_, _) => {
       raise @program.Failure("\{name} を起動できません: \{error}")
     },
@@ -79,34 +76,26 @@ fn unavailable(name : String, error : Error) -> @program.Program {
 
 ///|
 async fn main {
-  let cocoa : Cocoa = { messages: [], arrived: @cond_var.Cond(), }
+  let cocoa : Cocoa = { messages: @aqueue.Queue(kind=Unbounded), }
   @async.set_external_event_loop(cocoa)
   open_window(@utf8.encode(page_html))
   @async.with_task_group(group => {
-    let nushell = @nushell.nushell(group) catch {
-      e => unavailable("Nushell", e)
-    }
-    let app = @app.App::new(
-      [nushell, @mock.agent()],
-      spawn=job => {
-        let task = group.spawn(job, allow_failure=true)
-        () => task.cancel()
-      },
-      changed=show_frame,
-    )
+    let nushell = @nushell.nushell(group) catch { e => unavailable_nushell(e) }
+    let app = @app.App::new([nushell, @mock.agent()], group, changed=show_frame)
     for ;; {
-      while cocoa.messages.is_empty() {
-        cocoa.arrived.wait()
-      }
-      let request : @app.Request = @json.from_json(
-        @json.parse(@utf8.decode_lossy(cocoa.messages.remove(0))),
-      ) catch {
-        _ => Init
+      let message = @utf8.decode_lossy(cocoa.messages.get())
+      let request : @app.Request = @json.from_json(@json.parse(message)) catch {
+        e => {
+          println(
+            "patchbay: ignoring a request that does not decode: \{e}: \{message}",
+          )
+          continue
+        }
       }
       if request is Open(url~) {
         open_url(@utf8.encode(url))
       }
-      show_frame(app.handle(request))
+      app.handle(request)
     }
   })
 }

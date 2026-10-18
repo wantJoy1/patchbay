@@ -2,7 +2,7 @@ import {
   "wantJoy1/patchbay/app",
   "wantJoy1/patchbay/program",
   "moonbitlang/async",
-  "moonbitlang/async/cond_var",
+  "moonbitlang/async/aqueue",
   "moonbitlang/async/external_loop_integration",
   "wantJoy1/patchbay/mock",
   "wantJoy1/patchbay/nushell",

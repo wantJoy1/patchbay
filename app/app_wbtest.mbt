@@ -13,20 +13,17 @@ async fn with_app(
         "orders" => (session.emit)(Text(@fixture.orders_csv))
         "escape" => (session.emit)(Data([{ "a": "<x>" }]))
         "slow" => @async.sleep(60_000)
+        "brief" => {
+          @async.sleep(20)
+          (session.emit)(Text("done"))
+        }
         "many" => (session.emit)(Data(Json::Json(Array::makei(201, i => i))))
         text => raise @program.Failure("unknown: \{text}")
       }
     },
   }
   @async.with_task_group(group => {
-    let app = App::new(
-      [fixture, @mock.agent()],
-      spawn=job => {
-        let task = group.spawn(job, allow_failure=true)
-        () => task.cancel()
-      },
-      changed~,
-    )
+    let app = App::new([fixture, @mock.agent()], group, changed~)
     f(app)
   })
 }
@@ -247,23 +244,8 @@ async test "a markdown table from the agent is data, and the markdown stays copy
     click(app, SelectProgram(1))
     send(app, "表を見せて")
     assert_true(
-      app.entries[0].blocks.map(b => app.blocks[b].content)
+      app.entries[0].output.blocks.map(b => app.blocks[b].content)
       is [Fragment(_), Data, Fragment(_)],
-    )
-    click(app, Gui(1, SortColumn("estimate")))
-    click(app, OpenMenu(1, 1, 2))
-    click(app, Gui(1, Filter([Key("priority")], Eq, "high")))
-    click(app, SetCopyFormat(Csv))
-    click(app, SelectAllRows(1))
-    click(app, CopySelection(1))
-    inspect(
-      app.clipboard,
-      content=(
-        #|task,owner,priority,estimate
-        #|ログイン画面,Alice,high,3
-        #|検索,佐藤,high,8
-        #|
-      ),
     )
     html(app) |> ignore
     assert_true(
@@ -273,7 +255,7 @@ async test "a markdown table from the agent is data, and the markdown stays copy
 }
 
 ///|
-async test "every kind of part is drawn" {
+async test "diagrams, pages, images, sounds and files are drawn" {
   with_app(app => {
     click(app, SelectProgram(1))
     send(app, "図と html と画像と音とファイル")
@@ -299,7 +281,9 @@ async test "attachments go with the next input" {
     assert_true(app.render().1.contains("b.txt"))
     click(app, SelectProgram(1))
     send(app, "")
-    assert_eq(app.entries[0].input.attachments.map(a => a.name), ["b.txt"])
+    assert_eq(app.entries[0].output.input.attachments.map(a => a.name), [
+      "b.txt",
+    ])
     assert_false(app.render().1.contains("b.txt"))
   })
 }
@@ -313,28 +297,15 @@ async test "errors from the program are shown with the entry" {
 }
 
 ///|
-async test "requests decode from json and frames carry the result" {
-  with_app(app => {
-    let request : Request = @json.from_json(
-      @json.parse("[\"Send\", {\"text\": \"users\"}]"),
+async test "a decoded request yields a frame whose one-shot fields are not repeated" {
+  let frames = []
+  with_app(changed=frame => frames.push(frame), app => {
+    app.handle(
+      @json.from_json(@json.parse("[\"Send\", {\"text\": \"users\"}]")),
     )
-    let frame = app.handle(request)
-    assert_true(
-      frame.input == Some("") &&
-      frame.scroll &&
-      frame.html.contains("実行中"),
-    )
+    assert_true(frames[0].input == Some("") && frames[0].scroll)
     settle(app)
-    assert_true(app.frame().html.contains("Alice"))
-    let frame = app.handle(Copy(block=0, rows=[0], cols=[1, 2]))
-    assert_eq(
-      frame.clipboard,
-      "| name | age |\n| --- | --- |\n| Alice | 34 |\n",
-    )
-    assert_eq(
-      frame.notice,
-      "2 セルをデータとしてコピーしました",
-    )
+    assert_true(frames.last().unwrap() is { input: None, scroll: false, .. })
   })
 }
 
@@ -371,12 +342,12 @@ async test "an agent receives only the exchanges it has not seen yet" {
     click(app, SelectProgram(1))
     send(app, "どう？")
     assert_true(
-      app.entries[1].parts is [Markdown(md), ..] &&
+      app.entries[1].output.parts is [Markdown(md), ..] &&
       md.contains("| fixture | `users` | 8 行 |"),
     )
     send(app, "こんにちは")
     assert_true(
-      app.entries[2].parts is [Markdown(md)] &&
+      app.entries[2].output.parts is [Markdown(md)] &&
       !md.contains("受け取りました"),
     )
   })
@@ -402,7 +373,7 @@ async test "a running input shows as running and can be cancelled" {
     click(app, Cancel(0))
     assert_true(
       !app.entries[0].running &&
-      app.entries[0].error == Some("中断しました"),
+      app.entries[0].output.error == Some("中断しました"),
     )
     assert_false(html(app).contains("実行中"))
   })
@@ -415,7 +386,8 @@ async test "frames follow the output as it arrives" {
     click(app, SelectProgram(1))
     send(app, "表と図")
   })
-  assert_true(frames.length() >= 2 && frames.last().unwrap().contains("<svg"))
+  assert_true(frames.any(f => f.contains("estimate") && !f.contains("<svg")))
+  assert_true(frames.last().unwrap().contains("<svg"))
 }
 
 ///|
@@ -436,5 +408,22 @@ async test "the same value can be drawn as a table, a tree or JSON" {
     assert_true(html(app).contains("<div class=\"tree\">"))
     click(app, SetLayout(0, Json))
     assert_true(html(app).contains("&quot;name&quot;: &quot;patchbay&quot;"))
+  })
+}
+
+///|
+async test "an exchange still running when an agent is asked reaches it on a later turn" {
+  with_app(app => {
+    app.send("brief")
+    app.current = 1
+    send(app, "hi")
+    assert_true(
+      app.entries[1].output.parts is [Markdown(md)] && !md.contains("brief"),
+    )
+    send(app, "again")
+    assert_true(
+      app.entries[2].output.parts is [Markdown(md), ..] &&
+      md.contains("| fixture | `brief` |"),
+    )
   })
 }

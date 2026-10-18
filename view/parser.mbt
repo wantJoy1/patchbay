@@ -211,7 +211,7 @@ fn Parser::format(self : Parser) -> Format raise ParseError {
 ///|
 fn seg_of_piece(piece : StringView) -> Seg {
   match number_of_word(piece) {
-    Some(n) if n == n.trunc() => Idx(n.to_int())
+    Some(n) if n == n.trunc() && n >= 0 => Idx(n.to_int())
     _ => Key(piece.to_owned())
   }
 }

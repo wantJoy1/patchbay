@@ -10,8 +10,6 @@ pub fn compare(Json, Json) -> Int
 
 pub fn field(Json, String) -> Json?
 
-pub fn index(Json, Int) -> Json?
-
 pub fn infer(String) -> Json
 
 pub fn is_scalar(Json) -> Bool
@@ -25,6 +23,8 @@ pub fn to_delimited(Json, Char) -> String
 pub fn to_markdown(Json) -> String
 
 pub fn type_name(Json) -> String
+
+pub fn value_text(Json) -> String
 
 // Errors
 

@@ -2,7 +2,6 @@ import {
   "wantJoy1/patchbay/table",
   "moonbitlang/core/string",
   "moonbitlang/core/json",
-  "moonbitlang/core/cmp",
 }
 
 import {

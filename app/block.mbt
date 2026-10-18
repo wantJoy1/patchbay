@@ -6,7 +6,7 @@ priv enum Content {
   Page(String)
   Image(String)
   Audio(String)
-  File(name~ : String, media_type~ : String, String)
+  File(@program.Attachment)
 }
 
 ///|
@@ -58,8 +58,7 @@ fn blocks_of(part : @program.Part) -> Array[Block] {
     Text(s) => [Block::new(Data, output=Json::Json(s))]
     Image(src) => [Block::new(Image(src))]
     Audio(src) => [Block::new(Audio(src))]
-    File(data, name~, media_type~) =>
-      [Block::new(File(data, name~, media_type~))]
+    File(a) => [Block::new(File(a))]
   }
 }
 
@@ -98,8 +97,8 @@ fn Block::run(self : Block, view : Array[@view.Command]) -> Bool {
 
 ///|
 /// Why not apply while the view has an error: the shown value is stale, so the
-/// action would rewrite something else than what is seen. Removing the failing
-/// stage is allowed as a way to fix it.
+/// action would rewrite something else than what is seen; only removing a
+/// stage of a view that runs but fails stays possible, as a way to fix it.
 fn Block::apply(self : Block, action : @view.GuiAction) -> Result[Bool, String] {
   if self.view_error is Some(_) &&
     !(action is RemoveStage(_) && self.failed_stage is Some(_)) {
@@ -116,7 +115,7 @@ fn Block::apply(self : Block, action : @view.GuiAction) -> Result[Bool, String] 
 fn Block::toggle_row(self : Block, r : Int32, shift~ : Bool) -> Unit {
   match (shift, self.anchor) {
     (true, Some(a)) =>
-      for i in @cmp.minimum(a, r)..<=@cmp.maximum(a, r) {
+      for i in a.min(r)..<=a.max(r) {
         if !self.selected.contains(i) {
           self.selected.push(i)
         }
@@ -227,9 +226,5 @@ fn Block::copy_cells(
     Array([v]) => v
     _ => sub
   }
-  if @table.is_scalar(cell) {
-    @table.cell_text(cell)
-  } else {
-    cell.stringify(indent=2)
-  }
+  @table.value_text(cell)
 }

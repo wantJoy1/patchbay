@@ -1,3 +1,4 @@
 import {
   "wantJoy1/patchbay/table",
+  "wantJoy1/patchbay/html",
 }

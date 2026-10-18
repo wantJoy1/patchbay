@@ -2,10 +2,10 @@
 package "wantJoy1/patchbay/app"
 
 import {
+  "moonbitlang/async",
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
   "wantJoy1/patchbay/program",
-  "wantJoy1/patchbay/view",
 }
 
 // Values
@@ -16,10 +16,10 @@ import {
 pub struct App {
   // private fields
 }
-pub fn App::handle(Self, Request) -> Frame
-pub fn App::new(Array[@program.Program], spawn~ : (async () -> Unit) -> () -> Unit, changed~ : (Frame) -> Unit) -> Self
+pub fn App::handle(Self, Request) -> Unit
+pub fn App::new(Array[@program.Program], @async.TaskGroup[Unit], changed~ : (Frame) -> Unit) -> Self
 
-pub(all) struct Frame {
+pub struct Frame {
   html : String
   controls : String
   placeholder : String
@@ -29,11 +29,7 @@ pub(all) struct Frame {
   scroll : Bool
 } derive(ToJson)
 
-pub(all) enum Layout {
-  Table
-  Tree
-  Json
-} derive(Eq, @debug.Debug)
+type Layout derive(Eq, @debug.Debug)
 
 pub(all) enum Request {
   Init
@@ -45,26 +41,9 @@ pub(all) enum Request {
   History(delta~ : Int, text~ : String)
   Escape
   Open(url~ : String)
-} derive(@debug.Debug, @json.FromJson)
+} derive(@json.FromJson)
 
-pub(all) enum UiAction {
-  Gui(Int, @view.GuiAction)
-  OpenMenu(Int, Int, Int)
-  CloseMenu
-  ToggleRow(Int, Int)
-  SelectAllRows(Int)
-  ClearSelection(Int)
-  CopySelection(Int)
-  CopyText(String)
-  SetLayout(Int, Layout)
-  SetCopyFormat(@view.Format)
-  ShowAllRows(Int)
-  SelectProgram(Int)
-  UseInput(String)
-  Send(String)
-  RemoveAttachment(Int)
-  Cancel(Int)
-} derive(Eq, @debug.Debug)
+type UiAction derive(Eq, @debug.Debug)
 
 // Type aliases
 

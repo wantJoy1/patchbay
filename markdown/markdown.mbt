@@ -35,54 +35,44 @@ pub fn split(md : String) -> Array[Block] {
   }
   while i < lines.length() {
     let line = lines[i].trim(chars=" ")
-    if !(line is ("" | ['#', ..] | ['`', '`', '`', ..] | ['|', ..] | ['>', ..]) ||
-      list_item(line) is Some(_) ||
-      line is ("---" | "***")) {
-      paragraph.push(line.to_owned())
-      i += 1
-      continue
-    }
-    end_paragraph()
     match line {
-      "" => i += 1
+      "" => {
+        end_paragraph()
+        i += 1
+      }
       ['`', '`', '`', .. lang] => {
+        end_paragraph()
         i += 1
-        let body = take(l => !l.has_prefix("```"))
+        let code = take(l => !l.has_prefix("```"))
+          .map(l => l.to_owned())
+          .join("\n")
         i += 1
-        let code = body.map(l => l.to_owned()).join("\n")
         if lang.trim(chars=" ") == "mermaid" {
           flush()
           blocks.push(Mermaid(code))
         } else {
-          html.write_string("<pre><code>\{escape(code)}</code></pre>")
+          html.write_string("<pre><code>\{@html.escape(code)}</code></pre>")
         }
       }
       ['|', ..] if i + 1 < lines.length() && is_separator(lines[i + 1]) => {
+        end_paragraph()
         let header = row_cells(line)
         i += 2
-        let rows = take(l => l.has_prefix("|"))
-        flush()
-        blocks.push(
-          Table(
-            Json(
-              rows.map(row => {
-                let cells = row_cells(row)
-                Json(
-                  Map::from_array(
-                    header.mapi((c, name) => {
-                      (
-                        name,
-                        @table.infer(strip_inline(cells.get(c).unwrap_or(""))),
-                      )
-                    }),
-                  ),
-                )
+        let rows = take(l => l.has_prefix("|")).map(row => {
+          let cells = row_cells(row)
+          Json(
+            Map::from_array(
+              header.mapi((c, name) => {
+                (name, @table.infer(strip_inline(cells.get(c).unwrap_or(""))))
               }),
             ),
-          ),
-        )
+          )
+        })
+        flush()
+        blocks.push(Table(Json(rows)))
       }
       ['>', ..] => {
+        end_paragraph()
         let quoted = take(l => l.has_prefix(">")).map(l => {
           l.trim(chars=" ")[1:].trim(chars=" ").to_owned()
         })
@@ -91,28 +81,31 @@ pub fn split(md : String) -> Array[Block] {
         )
       }
       "---" | "***" => {
+        end_paragraph()
         html.write_string("<hr>")
         i += 1
       }
-      _ =>
-        match heading(line) {
-          Some((level, text)) => {
-            html.write_string("<h\{level}>\{inline(text)}</h\{level}>")
-            i += 1
-          }
-          None => {
-            let ordered = list_item(line).unwrap().0
-            let tag = if ordered { "ol" } else { "ul" }
-            let items = take(l => list_item(l).map(x => x.0) == Some(ordered))
-            html.write_string("<\{tag}>")
-            for item in items {
-              html.write_string(
-                "<li>\{inline(list_item(item.trim(chars=" ")).unwrap().1)}</li>",
-              )
-            }
-            html.write_string("</\{tag}>")
-          }
+      _ if heading(line) is Some((level, text)) => {
+        end_paragraph()
+        html.write_string("<h\{level}>\{inline(text)}</h\{level}>")
+        i += 1
+      }
+      _ if list_item(line) is Some((ordered, _)) => {
+        end_paragraph()
+        let tag = if ordered { "ol" } else { "ul" }
+        html.write_string("<\{tag}>")
+        while i < lines.length() &&
+              list_item(lines[i].trim(chars=" ")) is Some((o, text)) &&
+              o == ordered {
+          html.write_string("<li>\{inline(text)}</li>")
+          i += 1
         }
+        html.write_string("</\{tag}>")
+      }
+      _ => {
+        paragraph.push(line.to_owned())
+        i += 1
+      }
     }
   }
   end_paragraph()
@@ -188,28 +181,15 @@ fn strip_inline(s : String) -> String {
 }
 
 ///|
-fn escape(s : StringView) -> String {
-  let sb = StringBuilder()
-  for ch in s {
-    match ch {
-      '&' => sb.write_string("&amp;")
-      '<' => sb.write_string("&lt;")
-      '>' => sb.write_string("&gt;")
-      '"' => sb.write_string("&quot;")
-      _ => sb.write_char(ch)
-    }
-  }
-  sb.to_string()
-}
-
-///|
-pub fn inline(s : StringView) -> String {
+fn inline(s : StringView) -> String {
   let sb = StringBuilder()
   let mut rest = s
   while rest is [c, ..] {
     rest = lexmatch rest with longest {
       (re"^`[^`]+`" as code, after=r) => {
-        sb.write_string("<code>\{escape(code[1:code.length() - 1])}</code>")
+        sb.write_string(
+          "<code>\{@html.escape(code[1:code.length() - 1].to_owned())}</code>",
+        )
         r
       }
       (re"^\*\*[^*]+\*\*" as t, after=r) => {
@@ -224,12 +204,12 @@ pub fn inline(s : StringView) -> String {
       (re"^\[[^\]]*\]\((https?:|mailto:)[^)]*\)" as link, after=r) => {
         let mid = link.find("](").unwrap()
         sb.write_string(
-          "<a href=\"\{escape(link[mid + 2:link.length() - 1])}\">\{inline(link[1:mid])}</a>",
+          "<a href=\"\{@html.escape(link[mid + 2:link.length() - 1].to_owned())}\">\{inline(link[1:mid])}</a>",
         )
         r
       }
       (re"^.", after=r) => {
-        sb.write_string(escape(c.to_string()))
+        sb.write_string(@html.escape(c.to_string()))
         r
       }
       _ => ""

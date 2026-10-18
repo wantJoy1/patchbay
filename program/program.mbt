@@ -27,7 +27,7 @@ pub(all) enum Part {
   Text(String)
   Image(String)
   Audio(String)
-  File(name~ : String, media_type~ : String, String)
+  File(Attachment)
 } derive(Eq, Debug)
 
 ///|

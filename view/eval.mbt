@@ -205,7 +205,7 @@ fn take(input : Json, n : Int32?, from_end~ : Bool) -> Json raise CmdError {
         CmdError("\{name} on an empty list"),
       )
     Some(n) => {
-      let n = @cmp.minimum(n, items.length())
+      let n = n.min(items.length())
       Json::Json(
         if from_end {
           items[items.length() - n:].to_owned()
@@ -316,8 +316,8 @@ fn math(op : MathOp, items : Array[Json]) -> Json raise CmdError {
   }
   Json::Json(
     match op {
-      Min => numbers.fold(init=first, @cmp.minimum)
-      Max => numbers.fold(init=first, @cmp.maximum)
+      Min => numbers.fold(init=first, Double::min)
+      Max => numbers.fold(init=first, Double::max)
       _ => sum / numbers.length().to_double()
     },
   )

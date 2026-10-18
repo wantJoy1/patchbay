@@ -50,7 +50,6 @@ body {
   font: 14px/1.5 var(--sans);
 }
 
-body.dropping { outline: 3px dashed var(--accent); outline-offset: -6px; }
 
 code, pre, textarea, .view-input { font-family: var(--mono); }
 pre { margin: 0; padding: 10px 12px; overflow: auto; max-height: 60vh; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-size: 13px; }
@@ -181,12 +180,6 @@ button:hover { border-color: var(--accent); }
 }
 .file-button:hover { border-color: var(--accent); color: var(--fg); }
 
-.stages {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-}
 .stage {
   display: inline-flex;
   align-items: center;
@@ -432,7 +425,7 @@ window.patchbay = {
     drawTranscript(frame.html);
     controls.innerHTML = frame.controls;
     input.placeholder = frame.placeholder;
-    if (frame.input !== undefined && frame.input !== null) {
+    if (frame.input != null) {
       input.value = frame.input;
       autosize();
       input.focus();

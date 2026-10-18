@@ -1,12 +1,12 @@
 ///|
-pub(all) enum Layout {
+enum Layout {
   Table
   Tree
   Json
 } derive(Eq, Debug)
 
 ///|
-pub(all) enum UiAction {
+enum UiAction {
   Gui(Int32, @view.GuiAction)
   OpenMenu(Int32, Int32, Int32)
   CloseMenu
@@ -14,6 +14,7 @@ pub(all) enum UiAction {
   SelectAllRows(Int32)
   ClearSelection(Int32)
   CopySelection(Int32)
+  CopyAll(Int32)
   CopyText(String)
   SetLayout(Int32, Layout)
   SetCopyFormat(@view.Format)
@@ -26,39 +27,40 @@ pub(all) enum UiAction {
 } derive(Eq, Debug)
 
 ///|
-priv struct Entry {
+priv struct Output {
   program : Int32
   input : @program.Input
   parts : Array[@program.Part]
   mut error : String?
   blocks : Array[Int32]
-  steps : Array[Entry]
+}
+
+///|
+fn Output::new(program : Int32, input : @program.Input) -> Output {
+  { program, input, parts: [], error: None, blocks: [], }
+}
+
+///|
+fn Output::reply(self : Output) -> @program.Reply {
+  { parts: self.parts, error: self.error, }
+}
+
+///|
+/// Why not one output per entry: the programs an agent runs are steps of
+/// its entry, drawn with it.
+priv struct Entry {
+  output : Output
+  steps : Array[Output]
+  seen_by : Array[Int32]
   mut running : Bool
   mut cancel : () -> Unit
 }
 
 ///|
-fn Entry::new(program : Int32, input : @program.Input) -> Entry {
-  {
-    program,
-    input,
-    parts: [],
-    error: None,
-    blocks: [],
-    steps: [],
-    running: true,
-    cancel: () => (),
-  }
-}
-
-///|
-fn Entry::reply(self : Entry) -> @program.Reply {
-  { parts: self.parts, error: self.error, }
-}
-
-///|
 pub struct App {
   priv programs : Array[@program.Program]
+  priv group : @async.TaskGroup[Unit]
+  priv changed : (Frame) -> Unit
   priv mut current : Int32
   priv entries : Array[Entry]
   priv blocks : Array[Block]
@@ -72,25 +74,21 @@ pub struct App {
   priv mut clipboard : String
   priv mut notice : String
   priv mut scroll_to_end : Bool
-  // Why not number actions globally: keys scoped to an entry keep its HTML
-  // unchanged until it changes, so the page can leave it alone.
   priv actions : Map[String, UiAction]
   priv mut scope : String
   priv mut next_act : Int32
-  priv spawn : (async () -> Unit) -> () -> Unit
-  priv changed : (Frame) -> Unit
 }
 
 ///|
 pub fn App::new(
   programs : Array[@program.Program],
-  spawn~ : (async () -> Unit) -> () -> Unit,
+  group : @async.TaskGroup[Unit],
   changed~ : (Frame) -> Unit,
 ) -> App {
   {
-    spawn,
-    changed,
     programs,
+    group,
+    changed,
     current: 0,
     entries: [],
     blocks: [],
@@ -111,6 +109,11 @@ pub fn App::new(
 }
 
 ///|
+fn App::notify(self : App) -> Unit {
+  (self.changed)(self.frame())
+}
+
+///|
 fn App::send(self : App, text : String) -> Unit {
   let text = text.trim().to_owned()
   if text == "" && self.pending.is_empty() {
@@ -123,9 +126,20 @@ fn App::send(self : App, text : String) -> Unit {
   } else {
     []
   }
-  let entry = Entry::new(self.current, input)
+  let entry : Entry = {
+    output: Output::new(self.current, input),
+    steps: [],
+    seen_by: [],
+    running: true,
+    cancel: () => (),
+  }
   self.entries.push(entry)
-  entry.cancel = (self.spawn)(() => self.run(entry, unseen))
+  let task = self.group.spawn(allow_failure=true, () => {
+    self.execute(entry.output, unseen, entry.steps)
+    entry.running = false
+    self.notify()
+  })
+  entry.cancel = () => task.cancel()
   if text != "" && self.history.last() != Some((self.current, text)) {
     self.history.push((self.current, text))
   }
@@ -136,57 +150,53 @@ fn App::send(self : App, text : String) -> Unit {
 }
 
 ///|
-async fn App::run(
+async fn App::execute(
   self : App,
-  entry : Entry,
+  output : Output,
   unseen : Array[@program.Exchange],
+  steps : Array[Output],
 ) -> Unit {
   let session : @program.Session = {
     unseen,
     programs: self.programs.map(q => (q.name, q.kind)),
     emit: part => {
-      entry.parts.push(part)
+      output.parts.push(part)
       for block in blocks_of(part) {
-        entry.blocks.push(self.blocks.length())
+        output.blocks.push(self.blocks.length())
         self.blocks.push(block)
       }
-      (self.changed)(self.frame())
+      self.notify()
     },
     run: (name, input) => {
       guard self.programs.search_by(q => q.name == name) is Some(q) else {
         return { parts: [], error: Some("unknown program: \{name}"), }
       }
-      let step = Entry::new(q, input)
-      entry.steps.push(step)
-      self.run(step, [])
+      let step = Output::new(q, input)
+      steps.push(step)
+      self.execute(step, [], steps)
       step.reply()
     },
   }
-  (self.programs[entry.program].send)(entry.input, session) catch {
-    @program.Failure(msg) => entry.error = Some(msg)
-    e => if entry.error is None { entry.error = Some(e.to_string()) }
+  (self.programs[output.program].send)(output.input, session) catch {
+    @program.Failure(msg) => output.error = Some(msg)
+    e => output.error = Some(e.to_string())
   }
-  entry.running = false
-  (self.changed)(self.frame())
 }
 
 ///|
 fn App::unseen_by(self : App, p : Int32) -> Array[@program.Exchange] {
-  let mut since = 0
-  for i, e in self.entries {
-    if e.program == p {
-      since = i + 1
+  let unseen = []
+  for e in self.entries {
+    if e.output.program != p && !e.running && !e.seen_by.contains(p) {
+      e.seen_by.push(p)
+      unseen.push(@program.Exchange::{
+        program: self.programs[e.output.program].name,
+        input: e.output.input,
+        reply: e.output.reply(),
+      })
     }
   }
-  self.entries[since:]
-  .iter()
-  .filter(e => !e.running)
-  .map(e => @program.Exchange::{
-    program: self.programs[e.program].name,
-    input: e.input,
-    reply: e.reply(),
-  })
-  .collect()
+  unseen
 }
 
 ///|
@@ -264,6 +274,11 @@ fn App::dispatch(self : App, id : String, shift~ : Bool) -> Unit {
         self.clipboard = blk.selection_text(self.copy_format)
         self.notice = "\{blk.selected.length()} 行を \{self.copy_format.name()} でコピーしました"
       })
+    CopyAll(b) =>
+      with_block(b, blk => {
+        self.clipboard = @view.serialize(blk.shown, self.copy_format)
+        self.notice = "\{self.copy_format.name()} でコピーしました"
+      })
     CopyText(text) => {
       self.clipboard = text
       self.menu = None
@@ -281,7 +296,7 @@ fn App::dispatch(self : App, id : String, shift~ : Bool) -> Unit {
     RemoveAttachment(i) => self.pending.remove(i) |> ignore
     Cancel(i) =>
       if self.entries.get(i) is Some({ running: true, .. } as entry) {
-        entry.error = Some("中断しました")
+        entry.output.error = Some("中断しました")
         entry.running = false
         (entry.cancel)()
       }

@@ -2,18 +2,18 @@
 let row_limit = 200
 
 ///|
-fn escape_html(s : String) -> String {
-  s
-  .replace_all(old="&", new="&amp;")
-  .replace_all(old="<", new="&lt;")
-  .replace_all(old=">", new="&gt;")
-  .replace_all(old="\"", new="&quot;")
-}
-
-///|
-fn App::act(self : App, action : UiAction) -> String {
-  let key = "\{self.scope}.\{self.next_act}"
-  self.next_act += 1
+/// Why not number every action of an entry in order: a streaming entry adds
+/// blocks, which would shift the keys a click from an older frame still
+/// names. Blocks get their own scopes and entry buttons their own names.
+fn App::act(self : App, action : UiAction, name? : String) -> String {
+  let name = match name {
+    Some(name) => name
+    None => {
+      self.next_act += 1
+      (self.next_act - 1).to_string()
+    }
+  }
+  let key = "\{self.scope}.\{name}"
   self.actions[key] = action
   " data-act=\"\{key}\""
 }
@@ -25,13 +25,14 @@ fn App::button(
   action : UiAction,
   class~ : String = "",
   title~ : String = "",
+  name? : String,
 ) -> String {
-  "<button class=\"\{class}\" title=\"\{escape_html(title)}\"\{self.act(action)}>\{label}</button>"
+  "<button class=\"\{class}\" title=\"\{@html.escape(title)}\"\{self.act(action, name?)}>\{label}</button>"
 }
 
 ///|
 fn code(text : String) -> String {
-  "<code>\{escape_html(text)}</code>"
+  "<code>\{@html.escape(text)}</code>"
 }
 
 ///|
@@ -65,13 +66,13 @@ fn App::render(self : App) -> (String, String) {
   self.enter("c")
   let programs = self.programs.mapi((i, p) => {
     self.button(
-      escape_html(p.name),
+      @html.escape(p.name),
       SelectProgram(i),
       class=if i == self.current { "tab active" } else { "tab" },
     )
   })
   let pending = self.pending.mapi((i, a) => {
-    "<span class=\"chip\">\{escape_html(a.name)}\{self.button("×", RemoveAttachment(i), class="remove")}</span>"
+    "<span class=\"chip\">\{@html.escape(a.name)}\{self.button("×", RemoveAttachment(i), class="remove")}</span>"
   })
   (
     "<div>\{entries.join("")}</div>",
@@ -107,26 +108,22 @@ fn App::render_welcome(self : App) -> String {
 
 ///|
 fn App::render_entry(self : App, i : Int32, entry : Entry) -> String {
-  let program = self.programs[entry.program]
-  let text = entry.input.text
+  let output = entry.output
+  let text = output.input.text
   let said = if text == "" {
     ""
   } else {
-    "<pre class=\"input-text\">\{escape_html(text)}</pre>\{self.button("入力に戻す", UseInput(text), class="small")}"
+    "<pre class=\"input-text\">\{@html.escape(text)}</pre>\{self.button("入力に戻す", UseInput(text), class="small", name="input")}"
   }
-  let attachments = entry.input.attachments.map(a => {
-    "<span class=\"chip\">\{escape_html(a.name)}</span>"
+  let attachments = output.input.attachments.map(a => {
+    "<span class=\"chip\">\{@html.escape(a.name)}</span>"
   })
   let running = if entry.running {
-    "<div class=\"running\">実行中…\{self.button("中断", Cancel(i), class="small")}</div>"
+    "<div class=\"running\">実行中…\{self.button("中断", Cancel(i), class="small", name="cancel")}</div>"
   } else {
     ""
   }
-  let steps = entry.steps.map(step => {
-    let name = escape_html(self.programs[step.program].name)
-    "<div class=\"step\"><div class=\"said\"><span class=\"who\">AI → \{name}</span>\{code(step.input.text)}</div>\{self.render_reply(step)}</div>"
-  })
-  let markdown = entry.parts.filter_map(p => {
+  let markdown = output.parts.filter_map(p => {
     if p is Markdown(md) {
       Some(md)
     } else {
@@ -140,65 +137,72 @@ fn App::render_entry(self : App, i : Int32, entry : Entry) -> String {
       "元の Markdown をコピー",
       CopyText(markdown.join("\n\n")),
       class="small",
+      name="markdown",
     )
   }
+  let steps = entry.steps.map(step => {
+    let name = @html.escape(self.programs[step.program].name)
+    "<div class=\"step\"><div class=\"said\"><span class=\"who\">AI → \{name}</span>\{code(step.input.text)}</div>\{self.render_output(step)}</div>"
+  })
   (
-    $|<section class="entry" data-key="e\{i}"><div class="said"><span class="who">\{escape_html(program.name)}</span>
-    $|\{said}\{attachments.join("")}</div>\{steps.join("")}\{self.render_reply(entry)}\{running}\{tools}</section>
+    $|<section class="entry" data-key="e\{i}"><div class="said"><span class="who">\{@html.escape(self.programs[output.program].name)}</span>
+    $|\{said}\{attachments.join("")}</div>\{steps.join("")}\{self.render_output(output)}\{running}\{tools}</section>
   )
 }
 
 ///|
-fn App::render_reply(self : App, entry : Entry) -> String {
+fn App::render_output(self : App, output : Output) -> String {
   // Why not for every interpreter: a view transform is written in nu, so only
   // a nu input can take it in.
-  let adopt = if self.programs[entry.program].kind is Interpreter(language="nu") &&
-    entry.input.text != "" {
-    Some(entry.input.text)
+  let adopt = if self.programs[output.program].kind
+    is Interpreter(language="nu") &&
+    output.input.text != "" {
+    Some(output.input.text)
   } else {
     None
   }
-  let blocks = entry.blocks.map(b => self.render_block(b, adopt))
-  blocks.join("") + entry.error.map(error_html).unwrap_or("")
+  let blocks = output.blocks.map(b => self.render_block(b, adopt))
+  blocks.join("") + output.error.map(error_html).unwrap_or("")
 }
 
 ///|
 fn error_html(msg : String) -> String {
-  "<div class=\"error\" role=\"alert\">\{escape_html(msg)}</div>"
+  "<div class=\"error\" role=\"alert\">\{@html.escape(msg)}</div>"
 }
 
 ///|
 fn App::render_block(self : App, b : Int32, adopt : String?) -> String {
+  self.enter("b\{b}")
   let block = self.blocks[b]
   let copy = (label, text) => self.button(label, CopyText(text), class="small")
   match block.content {
     Data => {
       let stale = if block.view_error is Some(_) { " stale" } else { "" }
       (
-        $|<div class="block data" data-b="\{b}">\{self.render_toolbar(b)}\{self.render_view_bar(b, adopt)}
+        $|<div class="block" data-b="\{b}">\{self.render_toolbar(b)}\{self.render_view_bar(b, adopt)}
         $|\{self.render_selection_bar(b)}<div class="view\{stale}">\{self.render_value(b)}</div></div>
       )
     }
     Fragment(html) => "<div class=\"block md\">\{html}</div>"
     Diagram(src) => {
       let figure = @mermaid.to_svg(src).unwrap_or(
-        "<pre>\{escape_html(src)}</pre>",
+        "<pre>\{@html.escape(src)}</pre>",
       )
       "<div class=\"block diagram\">\{figure}\{copy("Mermaid をコピー", src)}</div>"
     }
     Page(html) =>
-      "<div class=\"block page\"><iframe sandbox=\"allow-scripts\" srcdoc=\"\{escape_html(html)}\"></iframe>\{copy("HTML をコピー", html)}</div>"
+      "<div class=\"block page\"><iframe sandbox=\"allow-scripts\" srcdoc=\"\{@html.escape(html)}\"></iframe>\{copy("HTML をコピー", html)}</div>"
     Image(src) =>
-      "<div class=\"block\"><img src=\"\{escape_html(src)}\" alt=\"\"></div>"
+      "<div class=\"block\"><img src=\"\{@html.escape(src)}\" alt=\"\"></div>"
     Audio(src) =>
-      "<div class=\"block\"><audio controls src=\"\{escape_html(src)}\"></audio></div>"
-    File(data, name~, media_type~) => {
-      let preview = if data.has_prefix("data:") {
-        ""
+      "<div class=\"block\"><audio controls src=\"\{@html.escape(src)}\"></audio></div>"
+    File(a) => {
+      let preview = if a.is_text() {
+        "<pre>\{@html.escape(a.data)}</pre>"
       } else {
-        "<pre>\{escape_html(data)}</pre>"
+        ""
       }
-      "<div class=\"block file\"><b>\{escape_html(name)}</b> <span class=\"info\">\{escape_html(media_type)}</span>\{copy("内容をコピー", data)}\{preview}</div>"
+      "<div class=\"block file\"><b>\{@html.escape(a.name)}</b> <span class=\"info\">\{@html.escape(a.media_type)}</span>\{copy("内容をコピー", a.data)}\{preview}</div>"
     }
   }
 }
@@ -227,8 +231,8 @@ fn App::render_view_bar(self : App, b : Int32, adopt : String?) -> String {
   }
   let error = block.view_error.map(error_html).unwrap_or("")
   (
-    $|<div class="viewbar"><span class="label">表示の変換</span>\{stages.join("")}
-    $|<input class="view-input" data-view="\{b}" value="\{escape_html(block.view_text)}" spellcheck="false" autocomplete="off" placeholder="sort-by age | where age &gt; 30">\{adopt}</div>\{error}
+    $|<div class="viewbar"><span>表示の変換</span>\{stages.join("")}
+    $|<input class="view-input" data-view="\{b}" value="\{@html.escape(block.view_text)}" spellcheck="false" autocomplete="off" placeholder="sort-by age | where age &gt; 30">\{adopt}</div>\{error}
   )
 }
 
@@ -256,11 +260,7 @@ fn App::render_toolbar(self : App, b : Int32) -> String {
   let formats = [@view.Format::Md, Tsv, Csv, Json].map(f => {
     tab(f.name(), f == self.copy_format, SetCopyFormat(f))
   })
-  let all = self.button(
-    "全体をコピー",
-    CopyText(@view.serialize(block.shown, self.copy_format)),
-    class="tab",
-  )
+  let all = self.button("全体をコピー", CopyAll(b), class="tab")
   "<div class=\"toolbar\"><b>\{describe(block.shown)}</b><span>表示: \{modes.join("")}</span><span>コピー形式: \{formats.join("")}\{all}</span></div>"
 }
 
@@ -290,7 +290,7 @@ fn App::render_value(self : App, b : Int32) -> String {
   let block = self.blocks[b]
   let v = block.shown
   match (block.layout, shape_of(v)) {
-    (Json, _) => "<pre>\{escape_html(v.stringify(indent=2))}</pre>"
+    (Json, _) => "<pre>\{@html.escape(v.stringify(indent=2))}</pre>"
     (Tree, _) => "<div class=\"tree\">\{self.render_tree(b, v, [], 0)}</div>"
     (Table, Rows(rows, columns)) => self.render_rows(b, rows, columns)
     (Table, Items(items)) =>
@@ -316,7 +316,7 @@ fn App::render_value(self : App, b : Int32) -> String {
           let (name, v) = fields[r]
           let path : Array[@view.Seg] = [Key(name)]
           [
-            "<td class=\"cell key\" data-r=\"\{r}\" data-c=\"0\">\{escape_html(name)}</td>",
+            "<td class=\"cell key\" data-r=\"\{r}\" data-c=\"0\">\{@html.escape(name)}</td>",
             self.render_cell(b, r, 1, v, () => {
               [self.gui_item(b, Drill(path), Get(path)), self.copy_item(v)]
             }),
@@ -329,11 +329,11 @@ fn App::render_value(self : App, b : Int32) -> String {
       })
       (
         $|<div class="text-actions">構造として読む: \{parse.join("")}\{self.gui_item(b, Append(Lines), Lines)}
-        $|\{self.button("値をコピー", CopyText(s))}</div><pre>\{escape_html(s)}</pre>
+        $|\{self.button("値をコピー", CopyText(s))}</div><pre>\{@html.escape(s)}</pre>
       )
     }
     (Table, Scalar(v)) =>
-      "<div class=\"scalar\">\{escape_html(@table.cell_text(v))}</div>"
+      "<div class=\"scalar\">\{@html.escape(@table.cell_text(v))}</div>"
   }
 }
 
@@ -362,11 +362,7 @@ fn App::render_grid(
   } else {
     self.button("☐", SelectAllRows(b), class="check")
   }
-  let shown = if block.show_all {
-    count
-  } else {
-    @cmp.minimum(count, row_limit)
-  }
+  let shown = if block.show_all { count } else { count.min(row_limit) }
   let rows = Array::makei(shown, r => {
     let selected = block.selected.contains(r)
     let check = self.button(
@@ -403,7 +399,7 @@ fn App::render_rows(
       _ => ""
     }
     let sort_button = self.button(
-      "\{escape_html(col)}<span class=\"arrow\">\{arrow}</span>",
+      "\{@html.escape(col)}<span class=\"arrow\">\{arrow}</span>",
       Gui(b, SortColumn(col)),
       class="sort",
     )
@@ -448,17 +444,13 @@ fn App::render_cell(
   v : Json,
   menu : () -> Array[String],
 ) -> String {
-  let text = if @table.is_scalar(v) {
-    @table.cell_text(v)
-  } else {
-    @table.summary(v)
-  }
+  let text = @table.summary(v)
   let open = if self.menu == Some((b, r, c)) {
     "<div class=\"menu\">\{menu().join("")}\{self.button("閉じる", CloseMenu, class="item close")}</div>"
   } else {
     ""
   }
-  "<td class=\"cell \{cell_class(v)}\" data-r=\"\{r}\" data-c=\"\{c}\"\{self.act(OpenMenu(b, r, c))}>\{escape_html(text)}\{open}</td>"
+  "<td class=\"cell \{cell_class(v)}\" data-r=\"\{r}\" data-c=\"\{c}\"\{self.act(OpenMenu(b, r, c))}>\{@html.escape(text)}\{open}</td>"
 }
 
 ///|
@@ -479,12 +471,7 @@ fn App::filter_items(
 
 ///|
 fn App::copy_item(self : App, v : Json) -> String {
-  let text = if @table.is_scalar(v) {
-    @table.cell_text(v)
-  } else {
-    v.stringify(indent=2)
-  }
-  self.button("値をコピー", CopyText(text), class="item")
+  self.button("値をコピー", CopyText(@table.value_text(v)), class="item")
 }
 
 ///|
@@ -499,18 +486,18 @@ fn App::render_tree(
     Array(items) => items.mapi((i, item) => (Idx(i), i.to_string(), item))
     Object(fields) => fields.to_array().map(f => (Key(f.0), f.0, f.1))
     _ =>
-      return "<span class=\"\{cell_class(v)}\">\{escape_html(@table.cell_text(v))}</span>"
+      return "<span class=\"\{cell_class(v)}\">\{@html.escape(@table.cell_text(v))}</span>"
   }
   let items = children.map(child => {
     let (seg, label, item) = child
     let child_path = [..path, seg]
-    let key = "<span class=\"key\"\{self.act(Gui(b, Drill(child_path)))}>\{escape_html(label)}</span>"
+    let key = "<span class=\"key\"\{self.act(Gui(b, Drill(child_path)))}>\{@html.escape(label)}</span>"
     let inner = self.render_tree(b, item, child_path, depth + 1)
     if @table.is_scalar(item) {
       "<li>\{key}: \{inner}</li>"
     } else {
       let open = if depth < 2 { " open" } else { "" }
-      "<li><details\{open}><summary>\{key} <span class=\"summary\">\{escape_html(@table.summary(item))}</span></summary>\{inner}</details></li>"
+      "<li><details\{open}><summary>\{key} <span class=\"summary\">\{@html.escape(@table.summary(item))}</span></summary>\{inner}</details></li>"
     }
   })
   "<ul>\{items.join("")}</ul>"

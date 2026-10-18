@@ -29,6 +29,8 @@ priv struct Edge {
 
 ///|
 priv struct Flowchart {
+  vertical : Bool
+  reversed : Bool
   mut rest : StringView
   nodes : Map[String, (String, Shape)?]
   edges : Array[Edge]
@@ -36,15 +38,12 @@ priv struct Flowchart {
 
 ///|
 pub fn to_svg(src : String) -> String? {
-  try parse(src) catch {
-    _ => None
-  } noraise {
-    (chart, vertical, reversed) => Some(chart.render(vertical, reversed))
-  }
+  let chart = parse(src) catch { _ => return None }
+  Some(chart.render())
 }
 
 ///|
-fn parse(src : String) -> (Flowchart, Bool, Bool) raise Unsupported {
+fn parse(src : String) -> Flowchart raise Unsupported {
   let stmts = src
     .split("\n")
     .filter(l => !l.trim_start().has_prefix("%%"))
@@ -62,7 +61,7 @@ fn parse(src : String) -> (Flowchart, Bool, Bool) raise Unsupported {
     ["flowchart" | "graph", "RL"] => (false, true)
     _ => raise Unsupported
   }
-  let chart = { rest: "", nodes: {}, edges: [], }
+  let chart = { vertical, reversed, rest: "", nodes: {}, edges: [], }
   let ignored = [
     "classDef", "class ", "style ", "linkStyle", "click ", "subgraph", "direction",
   ]
@@ -73,7 +72,7 @@ fn parse(src : String) -> (Flowchart, Bool, Bool) raise Unsupported {
     chart.rest = s
     chart.statement()
   }
-  (chart, vertical, reversed)
+  chart
 }
 
 ///|
@@ -199,15 +198,6 @@ fn num(x : Double) -> String {
 }
 
 ///|
-fn escape(s : String) -> String {
-  s
-  .replace_all(old="&", new="&amp;")
-  .replace_all(old="<", new="&lt;")
-  .replace_all(old=">", new="&gt;")
-  .replace_all(old="\"", new="&quot;")
-}
-
-///|
 fn rect(
   l : Double,
   t : Double,
@@ -219,11 +209,8 @@ fn rect(
 }
 
 ///|
-fn Flowchart::render(
-  self : Flowchart,
-  vertical : Bool,
-  reversed : Bool,
-) -> String {
+fn Flowchart::render(self : Flowchart) -> String {
+  let { vertical, reversed, .. } = self
   let ids = self.nodes.keys().to_array()
   let nodes = ids.map(id => self.nodes[id].unwrap_or((id, Rect)))
   let index = Map::from_iter(ids.iter().mapi((i, id) => (id, i)))
@@ -347,7 +334,7 @@ fn Flowchart::render(
       },
     )
     texts.write_string(
-      "<text x=\"\{num(x)}\" y=\"\{num(y)}\">\{escape(label)}</text>",
+      "<text x=\"\{num(x)}\" y=\"\{num(y)}\">\{@html.escape(label)}</text>",
     )
   }
   fn clip(v : Int32, toward : Int32) -> (Double, Double) {
@@ -390,7 +377,7 @@ fn Flowchart::render(
         rect(x - w / 2.0, y - 9.0, w, 18.0, " stroke=\"none\""),
       )
       texts.write_string(
-        "<text x=\"\{num(x)}\" y=\"\{num(y)}\">\{escape(e.label)}</text>",
+        "<text x=\"\{num(x)}\" y=\"\{num(y)}\">\{@html.escape(e.label)}</text>",
       )
     }
   }

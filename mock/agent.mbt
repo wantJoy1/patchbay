@@ -82,11 +82,11 @@ let replies : Array[(Array[String], () -> @program.Part)] = [
   (
     ["ファイル", "file", "csv"],
     () => {
-      File(
-        name="tasks.csv",
-        media_type="text/csv",
-        "task,owner,estimate\nlogin,Alice,3\nexport,Bob,5\n",
-      )
+      File({
+        name: "tasks.csv",
+        media_type: "text/csv",
+        data: "task,owner,estimate\nlogin,Alice,3\nexport,Bob,5\n",
+      })
     },
   ),
 ]

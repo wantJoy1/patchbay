@@ -9,12 +9,12 @@ pub(all) enum Request {
   History(delta~ : Int32, text~ : String)
   Escape
   Open(url~ : String)
-} derive(FromJson, Debug)
+} derive(FromJson)
 
 ///|
 /// Why not send only what changed: a whole frame leaves the page no state of
 /// its own.
-pub(all) struct Frame {
+pub struct Frame {
   html : String
   controls : String
   placeholder : String
@@ -25,7 +25,7 @@ pub(all) struct Frame {
 } derive(ToJson)
 
 ///|
-pub fn App::handle(self : App, request : Request) -> Frame {
+pub fn App::handle(self : App, request : Request) -> Unit {
   match request {
     Send(text~) => self.send(text)
     Act(id~, shift~) => self.dispatch(id, shift~)
@@ -41,7 +41,7 @@ pub fn App::handle(self : App, request : Request) -> Frame {
     Escape => self.menu = None
     Init | Open(_) => ()
   }
-  self.frame()
+  self.notify()
 }
 
 ///|

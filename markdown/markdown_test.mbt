@@ -54,7 +54,18 @@ test "mermaid code blocks are diagrams and other code is escaped" {
 ///|
 test "inline markup allows only safe links" {
   assert_eq(
-    @markdown.inline("a `<b>` *c* **d** [e](javascript:x) * f"),
-    "a <code>&lt;b&gt;</code> <em>c</em> <strong>d</strong> [e](javascript:x) * f",
+    @markdown.split("a `<b>` *c* **d** [e](https://x) [f](javascript:y) * g"),
+    [
+      Html(
+        "<p>a <code>&lt;b&gt;</code> <em>c</em> <strong>d</strong> <a href=\"https://x\">e</a> [f](javascript:y) * g</p>",
+      ),
+    ],
   )
+}
+
+///|
+test "lines that only look like blocks are paragraph text" {
+  assert_eq(@markdown.split("#tag\n####### x\n| a | b |"), [
+    Html("<p>#tag ####### x | a | b |</p>"),
+  ])
 }

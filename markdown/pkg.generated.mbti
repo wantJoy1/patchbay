@@ -6,8 +6,6 @@ import {
 }
 
 // Values
-pub fn inline(StringView) -> String
-
 pub fn split(String) -> Array[Block]
 
 // Errors

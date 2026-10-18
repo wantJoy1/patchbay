@@ -65,9 +65,22 @@ async test "a one-row table arrives as its row, as nu's MCP server unwraps it" {
 }
 
 ///|
-async test "a cancelled input does not disturb the next one" {
+async test "a cancelled input stops in nu and the next input runs in a new session" {
   with_nu(nu => {
-    @async.with_timeout_opt(200, () => send(nu, "sleep 2sec; 1")) |> ignore
-    assert_eq(send(nu, "2"), { parts: [Data(2)], error: None, })
+    let path = "/tmp/patchbay-cancel-probe-\{@async.now()}"
+    @async.with_timeout_opt(100, () => {
+      send(nu, "sleep 400ms; 'x' | save \{path}")
+    })
+    |> ignore
+    @async.sleep(600)
+    assert_eq(send(nu, "'\{path}' | path exists"), {
+      parts: [
+        Text(
+          "前の入力を中断したため、新しいセッションで実行します",
+        ),
+        Data(false),
+      ],
+      error: None,
+    })
   })
 }
