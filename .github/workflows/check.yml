@@ -1,0 +1,47 @@
+name: check
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    # Why not Linux: the tests compile macos/host.m against Cocoa.
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - name: checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      # Why not the official install script or the latest release: a pinned
+      # version and hash keep the checks from changing, or running altered
+      # code, unless this file changes.
+      - name: moonbit 0.10.15
+        run: |
+          base=https://cli.moonbitlang.com
+          version=0.10.15%2B943464bfa
+          curl -fsSL -o moonbit.tar.gz "$base/binaries/$version/moonbit-darwin-aarch64.tar.gz"
+          curl -fsSL -o core.tar.gz "$base/cores/core-$version.tar.gz"
+          shasum -a 256 -c <<'EOF'
+          563109ff02c6dc77fdc74acd0be423964ef678dfea4d9b948c19d245dc8b0e83  moonbit.tar.gz
+          96d30f4dbcc6a9e1736ef26fbdd0e8fb0e97cb01d50e55d2a0072208b8061ae5  core.tar.gz
+          EOF
+          mkdir -p ~/.moon/lib
+          tar xf moonbit.tar.gz -C ~/.moon
+          tar xf core.tar.gz -C ~/.moon/lib
+          chmod +x ~/.moon/bin/* ~/.moon/bin/internal/tcc
+          rm moonbit.tar.gz core.tar.gz
+          ~/.moon/bin/moon -C ~/.moon/lib/core bundle --warn-list -a --all
+          ~/.moon/bin/moon update
+          echo ~/.moon/bin >> "$GITHUB_PATH"
+      - name: nushell 0.115.0
+        run: |
+          name=nu-0.115.0-aarch64-apple-darwin
+          curl -fsSL -o nu.tar.gz "https://github.com/nushell/nushell/releases/download/0.115.0/$name.tar.gz"
+          echo "91f3c77e4f634b54029b07e3dc4e99ffec5fc0f98537f9b630bda32b4d06da5e  nu.tar.gz" | shasum -a 256 -c
+          tar xf nu.tar.gz -C "$RUNNER_TEMP"
+          rm nu.tar.gz
+          echo "$RUNNER_TEMP/$name" >> "$GITHUB_PATH"
+      - run: sh .githooks/pre-commit

@@ -26,6 +26,9 @@ You can browse and install extra skills here:
 
 ## Tooling
 
+- Run `git config core.hooksPath .githooks` once, so each commit runs the
+  checks CI runs.
+
 - `moon fmt` is used to format your code properly.
 
 - `moon ide` provides project navigation helpers like `peek-def`, `outline`, and

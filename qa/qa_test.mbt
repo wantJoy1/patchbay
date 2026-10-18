@@ -1,8 +1,9 @@
 ///|
 /// Why not other languages: everything builds with moon alone, and only the
-/// macOS window and the page need glue in their own languages.
+/// macOS window, the page and the checks run by git and CI need glue in their
+/// own languages.
 let glue : Array[String] = [
-  "macos/host.m", "macos/page.html", ".githooks/pre-commit",
+  "macos/host.m", "macos/page.html", ".githooks/pre-commit", ".github/workflows/check.yml",
 ]
 
 ///|
@@ -44,16 +45,19 @@ async test "every comment says why another way was not taken" {
   let (root, files) = files()
   let offending = []
   for f in files {
-    guard f.has_suffix(".mbt") || f is ("macos/host.m" | "macos/page.html") else {
-      continue
+    let marker = match f {
+      ".githooks/pre-commit" | ".github/workflows/check.yml" => "#"
+      _ if f.has_suffix(".mbt") || f is ("macos/host.m" | "macos/page.html") =>
+        "/"
+      _ => continue
     }
     let mut in_comment = false
     for i, line in @fs.read_file("\{root}/\{f}").text().split("\n").collect() {
       let t = line.trim()
-      let comment = t.has_prefix("//") && t != "///|"
+      let comment = t.has_prefix(marker) && !(t is ("///|" | "#!/bin/sh"))
       if comment &&
         !in_comment &&
-        !t.trim_start(chars="/").trim().has_prefix("Why not") {
+        !t.trim_start(chars=marker).trim().has_prefix("Why not") {
         offending.push("\{f}:\{i + 1}: \{t}")
       }
       in_comment = comment
