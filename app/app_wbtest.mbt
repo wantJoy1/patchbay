@@ -12,6 +12,9 @@ async fn with_app(
         "config" => (session.emit)(Data(@fixture.config))
         "orders" => (session.emit)(Text(@fixture.orders_csv))
         "escape" => (session.emit)(Data([{ "a": "<x>" }]))
+        "times" =>
+          (session.emit)(Data([{ "t": "2026-10-18T15:07:24.4+09:00" }]))
+        "fraction" => (session.emit)(Data([{ "cpu": 3.106144393241167 }]))
         "slow" => @async.sleep(60_000)
         "brief" => {
           @async.sleep(20)
@@ -158,7 +161,8 @@ async test "copied cells are the data behind them" {
         #|}
       ),
     )
-    click(app, SetCopyFormat(Tsv))
+    click(app, OpenCopy(0))
+    click(app, CopyAs(0, Tsv))
     inspect(
       copy([1, 2], [1, 2]),
       content=(
@@ -188,7 +192,7 @@ async test "text output can be read as structured data" {
   with_app(app => {
     send(app, "orders")
     click(app, Gui(0, Append(From(Csv))))
-    assert_true(html(app).contains("表 · 10 行 × 6 列"))
+    assert_true(html(app).contains("10 行 · 6 列"))
   })
 }
 
@@ -234,7 +238,7 @@ async test "the sort arrow follows the view transform" {
   with_app(app => {
     send(app, "users")
     app.set_view(0, "sort-by age --reverse")
-    assert_true(html(app).contains("age<span class=\"arrow\"> ▼</span>"))
+    assert_true(html(app).contains("age<span class=\"arrow\"> ↓</span>"))
   })
 }
 
@@ -354,13 +358,15 @@ async test "an agent receives only the exchanges it has not seen yet" {
 }
 
 ///|
-async test "programs an agent runs are drawn as steps of its entry" {
+async test "programs an agent runs are steps of its entry, drawn when opened" {
   with_app(app => {
     click(app, SelectProgram(1))
     send(app, "`users` を見て")
     assert_true(app.entries[0].steps is [{ program: 0, .. }])
     let page = html(app)
-    assert_true(page.contains("AI → fixture") && page.contains("Alice"))
+    assert_true(page.contains("AI → fixture") && !page.contains("Alice"))
+    click(app, ToggleStep(0, 0))
+    assert_true(html(app).contains("Alice"))
   })
 }
 
@@ -369,13 +375,13 @@ async test "a running input shows as running and can be cancelled" {
   with_app(app => {
     app.send("slow")
     @async.pause()
-    assert_true(html(app).contains("実行中"))
+    assert_true(html(app).contains("中断"))
     click(app, Cancel(0))
     assert_true(
       !app.entries[0].running &&
       app.entries[0].output.error == Some("中断しました"),
     )
-    assert_false(html(app).contains("実行中"))
+    assert_false(html(app).contains("中断</button>"))
   })
 }
 
@@ -424,6 +430,56 @@ async test "an exchange still running when an agent is asked reaches it on a lat
     assert_true(
       app.entries[2].output.parts is [Markdown(md), ..] &&
       md.contains("| fixture | `brief` |"),
+    )
+  })
+}
+
+///|
+async test "a block copies in the format last chosen" {
+  with_app(app => {
+    send(app, "users")
+    click(app, OpenCopy(0))
+    click(app, CopyAs(0, Csv))
+    assert_true(app.clipboard.has_prefix("id,name,age"))
+    click(app, CopyAll(0))
+    assert_true(
+      app.copy_format == Csv && app.clipboard.has_prefix("id,name,age"),
+    )
+  })
+}
+
+///|
+async test "the transform editor shows only when asked for or in use" {
+  with_app(app => {
+    send(app, "users")
+    assert_false(html(app).contains("data-view"))
+    click(app, EditView(0))
+    assert_true(html(app).contains("data-view=\"0\""))
+    click(app, EditView(0))
+    assert_false(html(app).contains("data-view"))
+  })
+}
+
+///|
+async test "a timestamp shows its date and minute and keeps the full value" {
+  with_app(app => {
+    send(app, "times")
+    assert_true(
+      html(app).contains(
+        "title=\"2026-10-18T15:07:24.4+09:00\" data-r=\"0\" data-c=\"0\" data-act=\"b0.",
+      ) &&
+      html(app).contains(">2026-10-18 15:07<"),
+    )
+  })
+}
+
+///|
+async test "a long fraction shows two decimals and keeps the full value" {
+  with_app(app => {
+    send(app, "fraction")
+    assert_true(
+      html(app).contains("title=\"3.106144393241167\"") &&
+      html(app).contains(">3.11<"),
     )
   })
 }

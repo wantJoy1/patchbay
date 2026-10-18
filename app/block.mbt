@@ -22,6 +22,7 @@ priv struct Block {
   mut anchor : Int32?
   mut layout : Layout
   mut show_all : Bool
+  mut editing : Bool
 }
 
 ///|
@@ -38,6 +39,7 @@ fn Block::new(content : Content, output~ : Json = null) -> Block {
     anchor: None,
     layout: Table,
     show_all: false,
+    editing: false,
   }
 }
 

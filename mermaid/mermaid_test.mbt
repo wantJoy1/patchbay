@@ -120,7 +120,7 @@ test "a tiny graph renders to this svg" {
       #|<svg xmlns="http://www.w3.org/2000/svg" width="142" height="52" viewBox="-8 -8 142 52" font-size="13" stroke-width="1.5">
       #|<defs><marker id="patchbay-arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
       #|<g fill="none" stroke="currentColor"><line x1="31.5" y1="18" x2="79.5" y2="18" marker-end="url(#patchbay-arrow)"/></g>
-      #|<g stroke="currentColor" style="fill: var(--panel, #fff)"><rect x="0" y="0" width="31.5" height="36"/><rect x="79.5" y="0" width="46.5" height="36"/></g>
+      #|<g stroke="currentColor" style="fill: var(--surface, #fff)"><rect x="0" y="0" width="31.5" height="36"/><rect x="79.5" y="0" width="46.5" height="36"/></g>
       #|<g fill="currentColor" text-anchor="middle" dominant-baseline="central"><text x="15.8" y="18">A</text><text x="102.8" y="18">End</text></g>
       #|</svg>
     ),

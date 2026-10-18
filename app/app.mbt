@@ -6,24 +6,32 @@ enum Layout {
 } derive(Eq, Debug)
 
 ///|
+enum Menu {
+  Cell(Int32, Int32, Int32)
+  Copy(Int32)
+} derive(Eq)
+
+///|
 enum UiAction {
   Gui(Int32, @view.GuiAction)
   OpenMenu(Int32, Int32, Int32)
-  CloseMenu
   ToggleRow(Int32, Int32)
   SelectAllRows(Int32)
   ClearSelection(Int32)
   CopySelection(Int32)
   CopyAll(Int32)
+  CopyAs(Int32, @view.Format)
+  OpenCopy(Int32)
+  EditView(Int32)
   CopyText(String)
   SetLayout(Int32, Layout)
-  SetCopyFormat(@view.Format)
   ShowAllRows(Int32)
   SelectProgram(Int32)
   UseInput(String)
   Send(String)
   RemoveAttachment(Int32)
   Cancel(Int32)
+  ToggleStep(Int32, Int32)
 } derive(Eq, Debug)
 
 ///|
@@ -33,11 +41,12 @@ priv struct Output {
   parts : Array[@program.Part]
   mut error : String?
   blocks : Array[Int32]
+  mut open : Bool
 }
 
 ///|
 fn Output::new(program : Int32, input : @program.Input) -> Output {
-  { program, input, parts: [], error: None, blocks: [], }
+  { program, input, parts: [], error: None, blocks: [], open: false, }
 }
 
 ///|
@@ -69,7 +78,7 @@ pub struct App {
   priv mut history_cursor : Int32?
   priv mut draft : String
   priv mut next_input : String?
-  priv mut menu : (Int32, Int32, Int32)?
+  priv mut menu : Menu?
   priv mut copy_format : @view.Format
   priv mut clipboard : String
   priv mut notice : String
@@ -219,7 +228,7 @@ fn App::history_step(self : App, delta : Int32, text : String) -> Unit {
 
 ///|
 fn App::close_menu_of(self : App, b : Int32) -> Unit {
-  if self.menu is Some((mb, _, _)) && mb == b {
+  if self.menu is Some(Cell(mb, _, _) | Copy(mb)) && mb == b {
     self.menu = None
   }
 }
@@ -252,12 +261,18 @@ fn App::dispatch(self : App, id : String, shift~ : Bool) -> Unit {
   match action {
     Gui(b, a) => self.apply(b, a)
     OpenMenu(b, r, c) =>
-      self.menu = if self.menu == Some((b, r, c)) {
+      self.menu = if self.menu == Some(Cell(b, r, c)) {
         None
       } else {
-        Some((b, r, c))
+        Some(Cell(b, r, c))
       }
-    CloseMenu => self.menu = None
+    OpenCopy(b) =>
+      self.menu = if self.menu == Some(Copy(b)) { None } else { Some(Copy(b)) }
+    EditView(b) => with_block(b, blk => blk.editing = !blk.editing)
+    ToggleStep(i, s) =>
+      if self.entries.get(i).bind(e => e.steps.get(s)) is Some(step) {
+        step.open = !step.open
+      }
     ToggleRow(b, r) => with_block(b, blk => blk.toggle_row(r, shift~))
     SelectAllRows(b) =>
       with_block(b, blk => {
@@ -279,13 +294,20 @@ fn App::dispatch(self : App, id : String, shift~ : Bool) -> Unit {
         self.clipboard = @view.serialize(blk.shown, self.copy_format)
         self.notice = "\{self.copy_format.name()} でコピーしました"
       })
+    CopyAs(b, format) => {
+      self.copy_format = format
+      self.menu = None
+      with_block(b, blk => {
+        self.clipboard = @view.serialize(blk.shown, format)
+        self.notice = "\{format.name()} でコピーしました"
+      })
+    }
     CopyText(text) => {
       self.clipboard = text
       self.menu = None
       self.notice = "コピーしました"
     }
     SetLayout(b, layout) => with_block(b, blk => blk.layout = layout)
-    SetCopyFormat(format) => self.copy_format = format
     ShowAllRows(b) => with_block(b, blk => blk.show_all = true)
     SelectProgram(i) => {
       self.current = i

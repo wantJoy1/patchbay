@@ -31,6 +31,8 @@ pub struct Frame {
 
 type Layout derive(Eq, @debug.Debug)
 
+type Menu derive(Eq)
+
 pub(all) enum Request {
   Init
   Send(text~ : String)

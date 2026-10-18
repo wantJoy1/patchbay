@@ -389,7 +389,7 @@ fn Flowchart::render(self : Flowchart) -> String {
     $|<svg xmlns="http://www.w3.org/2000/svg" width="\{w}" height="\{h}" viewBox="-8 -8 \{w} \{h}" font-size="13" stroke-width="1.5">
     $|<defs><marker id="patchbay-arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
     $|<g fill="none" stroke="currentColor">\{lines}</g>
-    $|<g stroke="currentColor" style="fill: var(--panel, #fff)">\{shapes}</g>
+    $|<g stroke="currentColor" style="fill: var(--surface, #fff)">\{shapes}</g>
     $|<g fill="currentColor" text-anchor="middle" dominant-baseline="central">\{texts}</g>
     $|</svg>
   )
