@@ -1,0 +1,17 @@
+import {
+  "wantJoy1/patchbay/table",
+  "wantJoy1/patchbay/lang",
+  "wantJoy1/patchbay/eval",
+  "wantJoy1/patchbay/action",
+  "wantJoy1/patchbay/program",
+  "wantJoy1/patchbay/markdown",
+  "wantJoy1/patchbay/mermaid",
+  "moonbitlang/core/cmp",
+  "moonbitlang/core/json",
+}
+
+import {
+  "wantJoy1/patchbay/mock",
+  "wantJoy1/patchbay/fixture",
+  "moonbitlang/core/debug",
+} for "wbtest"

@@ -1,0 +1,68 @@
+///|
+/// Why not bytes for `data`: the page reads a file as text or as a data URL,
+/// and either goes into HTML as it is.
+pub(all) struct Attachment {
+  name : String
+  media_type : String
+  data : String
+} derive(Eq, Debug)
+
+///|
+pub fn Attachment::is_text(self : Attachment) -> Bool {
+  !self.data.has_prefix("data:")
+}
+
+///|
+pub(all) struct Input {
+  text : String
+  attachments : Array[Attachment]
+} derive(Eq, Debug)
+
+///|
+pub(all) enum Part {
+  Markdown(String)
+  Mermaid(String)
+  Html(String)
+  Data(Json)
+  Text(String)
+  Image(String)
+  Audio(String)
+  File(name~ : String, media_type~ : String, String)
+} derive(Eq, Debug)
+
+///|
+pub(all) struct Reply {
+  parts : Array[Part]
+  error : String?
+} derive(Eq, Debug)
+
+///|
+pub(all) enum Kind {
+  Agent
+  Interpreter(language~ : String)
+} derive(Eq, Debug)
+
+///|
+pub(all) struct Exchange {
+  program : String
+  input : Input
+  reply : Reply
+} derive(Eq, Debug)
+
+///|
+/// Why not give a program only its own input: an agent works on the same
+/// programs as the human, so it must see their exchanges and run them itself.
+pub(all) struct Session {
+  unseen : Array[Exchange]
+  programs : Array[(String, Kind)]
+  run : (String, Input) -> Reply
+}
+
+///|
+/// Why not methods for the session: what carries over between inputs differs
+/// by program, so it stays in the closure behind `send`.
+pub(all) struct Program {
+  name : String
+  kind : Kind
+  send : (Input, Session) -> Reply
+}

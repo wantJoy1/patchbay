@@ -1,0 +1,24 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "wantJoy1/patchbay/markdown"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn inline(StringView) -> String
+
+pub fn split(String) -> Array[Block]
+
+// Errors
+
+// Types and methods
+pub(all) enum Block {
+  Html(String)
+  Table(Json)
+  Mermaid(String)
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

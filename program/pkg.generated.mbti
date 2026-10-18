@@ -1,0 +1,66 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "wantJoy1/patchbay/program"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) struct Attachment {
+  name : String
+  media_type : String
+  data : String
+} derive(Eq, @debug.Debug)
+pub fn Attachment::is_text(Self) -> Bool
+
+pub(all) struct Exchange {
+  program : String
+  input : Input
+  reply : Reply
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Input {
+  text : String
+  attachments : Array[Attachment]
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Kind {
+  Agent
+  Interpreter(language~ : String)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Part {
+  Markdown(String)
+  Mermaid(String)
+  Html(String)
+  Data(Json)
+  Text(String)
+  Image(String)
+  Audio(String)
+  File(name~ : String, media_type~ : String, String)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Program {
+  name : String
+  kind : Kind
+  send : (Input, Session) -> Reply
+}
+
+pub(all) struct Reply {
+  parts : Array[Part]
+  error : String?
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Session {
+  unseen : Array[Exchange]
+  programs : Array[(String, Kind)]
+  run : (String, Input) -> Reply
+}
+
+// Type aliases
+
+// Traits
