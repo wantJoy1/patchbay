@@ -1,7 +1,7 @@
 ///|
 priv struct Parser {
-  tokens : Array[(Tok, Int)]
-  mut i : Int
+  tokens : Array[(Tok, Int32)]
+  mut i : Int32
 }
 
 ///|
@@ -50,7 +50,7 @@ pub fn parse(src : String) -> Array[Command] raise ParseError {
 }
 
 ///|
-pub let command_names : Array[String] = [
+let command_names : Array[String] = [
   "sort-by",
   "sort",
   "where",
@@ -70,11 +70,8 @@ pub let command_names : Array[String] = [
 
 ///|
 fn Parser::command(self : Parser) -> Command raise ParseError {
-  let start = self.error("")
-  let fail = msg => {
-    let ParseError(pos~, _) = start
-    ParseError(pos~, msg)
-  }
+  let pos = self.tokens[self.i].1
+  let fail = msg => ParseError(pos~, msg)
   guard self.next() is Word(name) else { raise fail("expected a command") }
   let cmd = match name {
     "sort-by" => {
@@ -115,13 +112,13 @@ fn Parser::command(self : Parser) -> Command raise ParseError {
     "to" => To(self.format())
     "math" =>
       match self.next() {
-        Word(op) if lookup(math_ops, op) is Some(op) => Math(op)
+        Word(op) if named(math_ops, op) is Some(op) => Math(op)
         _ => raise fail("expected math sum, avg, min or max")
       }
     "find" =>
       match self.next() {
         Str(s) | Word(s) => Find(s)
-        Num(n) => Find(Json::number(n).stringify())
+        Num(n) => Find(Json::Json(n).stringify())
         _ => raise fail("find needs a text")
       }
     "parse" =>
@@ -130,7 +127,7 @@ fn Parser::command(self : Parser) -> Command raise ParseError {
         _ => raise fail("parse needs a pattern such as \"{a} {b}\"")
       }
     _ =>
-      match lookup(bare_commands, name) {
+      match named(bare_commands, name) {
         Some(cmd) => cmd
         None => {
           let similar = command_names.filter(c => c.has_prefix(name))
@@ -192,7 +189,7 @@ fn Parser::names_and_reverse(
 }
 
 ///|
-fn Parser::count(self : Parser) -> Int? raise ParseError {
+fn Parser::count(self : Parser) -> Int32? raise ParseError {
   guard self.peek() is Num(n) else { return None }
   if n != n.trunc() || n < 0 {
     raise self.error("expected a count")
@@ -204,7 +201,7 @@ fn Parser::count(self : Parser) -> Int? raise ParseError {
 ///|
 fn Parser::format(self : Parser) -> Format raise ParseError {
   match self.peek() {
-    Word(f) if lookup(formats, f) is Some(format) => {
+    Word(f) if named(formats, f) is Some(format) => {
       self.i += 1
       format
     }
@@ -288,7 +285,7 @@ fn Parser::cond_unary(self : Parser) -> Cond raise ParseError {
     _ => {
       let path = self.path()
       let op = match self.peek() {
-        Op(s) | Word(s) => lookup(cmp_ops, s)
+        Op(s) | Word(s) => named(cmp_ops, s)
         _ => None
       }
       guard op is Some(op) else {
@@ -307,7 +304,7 @@ fn Parser::value(self : Parser) -> Json raise ParseError {
   match self.peek() {
     Word(w) if !(w is ("true" | "false" | "null")) => {
       self.i += 1
-      Json::string(w)
+      Json::Json(w)
     }
     _ => self.literal()
   }
@@ -317,8 +314,8 @@ fn Parser::value(self : Parser) -> Json raise ParseError {
 fn Parser::literal(self : Parser) -> Json raise ParseError {
   let err = self.error("expected a value")
   match self.next() {
-    Num(n) => Json::number(n)
-    Str(s) => Json::string(s)
+    Num(n) => Json::Json(n)
+    Str(s) => Json::Json(s)
     Word("true") => true
     Word("false") => false
     Word("null") => null
@@ -334,14 +331,14 @@ fn Parser::literal(self : Parser) -> Json raise ParseError {
         }
       }
       self.i += 1
-      Json::array(items)
+      Json::Json(items)
     }
     Punct('{') => {
       let fields = Map([])
       while !(self.peek() is Punct('}')) {
         let key = match self.next() {
           Word(w) | Str(w) => w
-          Num(n) => Json::number(n).stringify()
+          Num(n) => Json::Json(n).stringify()
           Eof => raise self.error("unterminated record")
           _ => raise self.error("expected a field name")
         }
@@ -354,7 +351,7 @@ fn Parser::literal(self : Parser) -> Json raise ParseError {
         }
       }
       self.i += 1
-      Json::object(fields)
+      Json::Json(fields)
     }
     _ => raise err
   }

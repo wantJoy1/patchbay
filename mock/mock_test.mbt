@@ -2,9 +2,9 @@
 async fn ask(
   agent : @program.Program,
   text : String,
-  unseen? : Array[@program.Exchange] = [],
-  programs? : Array[(String, @program.Kind)] = [],
-  run? : async (String, @program.Input) -> @program.Reply = (_, _) => {
+  unseen~ : Array[@program.Exchange] = [],
+  programs~ : Array[(String, @program.Kind)] = [],
+  run~ : async (String, @program.Input) -> @program.Reply = (_, _) => {
     abort("no programs")
   },
 ) -> Array[@program.Part] {

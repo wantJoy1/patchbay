@@ -1,12 +1,12 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "wantJoy1/patchbay/lang"
+package "wantJoy1/patchbay/view"
 
 import {
   "moonbitlang/core/debug",
 }
 
 // Values
-pub let command_names : Array[String]
+pub fn apply(Array[Command], GuiAction) -> Array[Command]
 
 pub fn parse(String) -> Array[Command] raise ParseError
 
@@ -14,15 +14,19 @@ pub fn print(Array[Command]) -> String
 
 pub fn print_command(Command) -> String
 
-pub fn print_cond(Cond) -> String
+pub fn run(Array[Command], Json) -> Json raise EvalError
 
-pub fn print_name(String) -> String
+pub fn serialize(Json, Format) -> String
 
-pub fn print_path(Array[Seg]) -> String
-
-pub fn quote_string(String) -> String
+pub fn sort_state(Array[Command]) -> (String, Bool)?
 
 // Errors
+pub suberror EvalError {
+  EvalError(stage~ : Int, String)
+} derive(@debug.Debug)
+pub fn EvalError::message(Self) -> String
+pub fn EvalError::stage(Self) -> Int
+
 pub suberror ParseError {
   ParseError(pos~ : Int, String)
 } derive(@debug.Debug)
@@ -41,7 +45,6 @@ pub(all) enum CmpOp {
   StartsWith
   EndsWith
 } derive(Eq, @debug.Debug)
-pub fn CmpOp::symbol(Self) -> String
 
 pub(all) enum Command {
   SortBy(Array[String], reverse~ : Bool)
@@ -81,13 +84,23 @@ pub(all) enum Format {
 } derive(Eq, @debug.Debug)
 pub fn Format::name(Self) -> String
 
+pub(all) enum GuiAction {
+  SortColumn(String)
+  Filter(Array[Seg], CmpOp, Json)
+  HideColumn(String)
+  KeepColumns(Array[String])
+  KeepRows(Array[Int])
+  Drill(Array[Seg])
+  Append(Command)
+  RemoveStage(Int)
+} derive(Eq, @debug.Debug)
+
 pub(all) enum MathOp {
   Sum
   Avg
   Min
   Max
 } derive(Eq, @debug.Debug)
-pub fn MathOp::name(Self) -> String
 
 pub(all) enum Seg {
   Key(String)

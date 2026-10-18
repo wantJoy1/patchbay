@@ -23,8 +23,8 @@ fn App::button(
   self : App,
   label : String,
   action : UiAction,
-  class? : String = "",
-  title? : String = "",
+  class~ : String = "",
+  title~ : String = "",
 ) -> String {
   "<button class=\"\{class}\" title=\"\{escape_html(title)}\"\{self.act(action)}>\{label}</button>"
 }
@@ -37,29 +37,32 @@ fn code(text : String) -> String {
 ///|
 fn App::gui_item(
   self : App,
-  b : Int,
-  action : @action.GuiAction,
-  cmd : @lang.Command,
+  b : Int32,
+  action : @view.GuiAction,
+  cmd : @view.Command,
 ) -> String {
-  self.button(code(@lang.print_command(cmd)), Gui(b, action), class="item")
+  self.button(code(@view.print_command(cmd)), Gui(b, action), class="item")
+}
+
+///|
+fn App::enter(self : App, scope : String) -> Unit {
+  self.scope = scope
+  self.next_act = 0
 }
 
 ///|
 fn App::render(self : App) -> (String, String) {
   self.actions.clear()
-  self.scope = "w"
-  self.next_act = 0
+  self.enter("w")
   let entries = if self.entries.is_empty() {
     [self.render_welcome()]
   } else {
     self.entries.mapi((i, e) => {
-      self.scope = "e\{i}"
-      self.next_act = 0
+      self.enter("e\{i}")
       self.render_entry(i, e)
     })
   }
-  self.scope = "c"
-  self.next_act = 0
+  self.enter("c")
   let programs = self.programs.mapi((i, p) => {
     self.button(
       escape_html(p.name),
@@ -103,7 +106,7 @@ fn App::render_welcome(self : App) -> String {
 }
 
 ///|
-fn App::render_entry(self : App, i : Int, entry : Entry) -> String {
+fn App::render_entry(self : App, i : Int32, entry : Entry) -> String {
   let program = self.programs[entry.program]
   let text = entry.input.text
   let said = if text == "" {
@@ -165,7 +168,7 @@ fn error_html(msg : String) -> String {
 }
 
 ///|
-fn App::render_block(self : App, b : Int, adopt : String?) -> String {
+fn App::render_block(self : App, b : Int32, adopt : String?) -> String {
   let block = self.blocks[b]
   let copy = (label, text) => self.button(label, CopyText(text), class="small")
   match block.content {
@@ -201,7 +204,7 @@ fn App::render_block(self : App, b : Int, adopt : String?) -> String {
 }
 
 ///|
-fn App::render_view_bar(self : App, b : Int, adopt : String?) -> String {
+fn App::render_view_bar(self : App, b : Int32, adopt : String?) -> String {
   let block = self.blocks[b]
   // Why not show stages while the text does not parse: they would show an
   // older transform than the one being edited.
@@ -210,7 +213,7 @@ fn App::render_view_bar(self : App, b : Int, adopt : String?) -> String {
   } else {
     block.view.mapi((i, cmd) => {
       let failed = if block.failed_stage == Some(i) { " failed" } else { "" }
-      "<span class=\"stage\{failed}\">\{code(@lang.print_command(cmd))}\{self.button("×", Gui(b, RemoveStage(i)), class="remove")}</span>"
+      "<span class=\"stage\{failed}\">\{code(@view.print_command(cmd))}\{self.button("×", Gui(b, RemoveStage(i)), class="remove")}</span>"
     })
   }
   let adopt = match adopt {
@@ -242,7 +245,7 @@ fn describe(v : Json) -> String {
 }
 
 ///|
-fn App::render_toolbar(self : App, b : Int) -> String {
+fn App::render_toolbar(self : App, b : Int32) -> String {
   let block = self.blocks[b]
   let tab = (label, active, action) => {
     self.button(label, action, class=if active { "tab active" } else { "tab" })
@@ -250,23 +253,23 @@ fn App::render_toolbar(self : App, b : Int) -> String {
   let modes = [("table", Layout::Table), ("tree", Tree), ("json", Json)].map(m => {
     tab(m.0, m.1 == block.layout, SetLayout(b, m.1))
   })
-  let formats = [@lang.Format::Md, Tsv, Csv, Json].map(f => {
+  let formats = [@view.Format::Md, Tsv, Csv, Json].map(f => {
     tab(f.name(), f == self.copy_format, SetCopyFormat(f))
   })
   let all = self.button(
     "全体をコピー",
-    CopyText(@eval.serialize(block.shown, self.copy_format)),
+    CopyText(@view.serialize(block.shown, self.copy_format)),
     class="tab",
   )
   "<div class=\"toolbar\"><b>\{describe(block.shown)}</b><span>表示: \{modes.join("")}</span><span>コピー形式: \{formats.join("")}\{all}</span></div>"
 }
 
 ///|
-fn App::render_selection_bar(self : App, b : Int) -> String {
+fn App::render_selection_bar(self : App, b : Int32) -> String {
   let block = self.blocks[b]
   guard !block.selected.is_empty() else { return "" }
   // Why not `select ROW...` on a record: its rows are fields, kept by name.
-  let (keep, cmd) : (@action.GuiAction, @lang.Command) = match block.shown {
+  let (keep, cmd) : (@view.GuiAction, @view.Command) = match block.shown {
     Object(fields) => {
       let names = fields.keys().collect()
       let cols = block.selected.filter_map(r => names.get(r))
@@ -277,13 +280,13 @@ fn App::render_selection_bar(self : App, b : Int) -> String {
   (
     $|<div class="selection"><span>\{block.selected.length()} 行を選択中</span>
     $|\{self.button("\{self.copy_format.name()} でコピー", CopySelection(b))}
-    $|\{self.button("この行だけ残す \{code(@lang.print_command(cmd))}", Gui(b, keep))}
+    $|\{self.button("この行だけ残す \{code(@view.print_command(cmd))}", Gui(b, keep))}
     $|\{self.button("選択を解除", ClearSelection(b))}</div>
   )
 }
 
 ///|
-fn App::render_value(self : App, b : Int) -> String {
+fn App::render_value(self : App, b : Int32) -> String {
   let block = self.blocks[b]
   let v = block.shown
   match (block.layout, shape_of(v)) {
@@ -311,7 +314,7 @@ fn App::render_value(self : App, b : Int) -> String {
         fields.length(),
         r => {
           let (name, v) = fields[r]
-          let path : Array[@lang.Seg] = [Key(name)]
+          let path : Array[@view.Seg] = [Key(name)]
           [
             "<td class=\"cell key\" data-r=\"\{r}\" data-c=\"0\">\{escape_html(name)}</td>",
             self.render_cell(b, r, 1, v, () => {
@@ -321,7 +324,7 @@ fn App::render_value(self : App, b : Int) -> String {
         },
       )
     (Table, Text(s)) => {
-      let parse = [@lang.Format::Json, Csv, Tsv].map(f => {
+      let parse = [@view.Format::Json, Csv, Tsv].map(f => {
         self.gui_item(b, Append(From(f)), From(f))
       })
       (
@@ -348,10 +351,10 @@ fn cell_class(v : Json) -> String {
 ///|
 fn App::render_grid(
   self : App,
-  b : Int,
+  b : Int32,
   header : Array[String],
-  count : Int,
-  cells : (Int) -> Array[String],
+  count : Int32,
+  cells : (Int32) -> Array[String],
 ) -> String {
   let block = self.blocks[b]
   let all = if count > 0 && block.selected.length() == count {
@@ -389,11 +392,11 @@ fn App::render_grid(
 ///|
 fn App::render_rows(
   self : App,
-  b : Int,
+  b : Int32,
   rows : Array[Json],
   columns : Array[String],
 ) -> String {
-  let sort = @action.sort_state(self.blocks[b].view)
+  let sort = @view.sort_state(self.blocks[b].view)
   let header = columns.map(col => {
     let arrow = match sort {
       Some((c, reverse)) if c == col => if reverse { " ▼" } else { " ▲" }
@@ -408,7 +411,7 @@ fn App::render_rows(
       "×",
       Gui(b, HideColumn(col)),
       class="hide",
-      title=@lang.print_command(Reject([col])),
+      title=@view.print_command(Reject([col])),
     )
     "<th>\{sort_button}\{hide}</th>"
   })
@@ -416,8 +419,8 @@ fn App::render_rows(
     columns.mapi((c, col) => {
       let v = @table.field(rows[r], col).unwrap_or(null)
       self.render_cell(b, r, c, v, () => {
-        let path : Array[@lang.Seg] = [Key(col)]
-        let cell : Array[@lang.Seg] = [Idx(r), Key(col)]
+        let path : Array[@view.Seg] = [Key(col)]
+        let cell : Array[@view.Seg] = [Idx(r), Key(col)]
         [
           ..self.filter_items(b, path, v),
           ..if @table.is_scalar(v) {
@@ -439,9 +442,9 @@ fn App::render_rows(
 /// Why not build every menu: each item registers an action.
 fn App::render_cell(
   self : App,
-  b : Int,
-  r : Int,
-  c : Int,
+  b : Int32,
+  r : Int32,
+  c : Int32,
   v : Json,
   menu : () -> Array[String],
 ) -> String {
@@ -461,11 +464,11 @@ fn App::render_cell(
 ///|
 fn App::filter_items(
   self : App,
-  b : Int,
-  path : Array[@lang.Seg],
+  b : Int32,
+  path : Array[@view.Seg],
   v : Json,
 ) -> Array[String] {
-  let ops : Array[@lang.CmpOp] = match v {
+  let ops : Array[@view.CmpOp] = match v {
     Number(_, ..) => [Eq, Ne, Ge, Le]
     String(_) => [Eq, Ne, Contains]
     Array(_) | Object(_) => []
@@ -487,12 +490,12 @@ fn App::copy_item(self : App, v : Json) -> String {
 ///|
 fn App::render_tree(
   self : App,
-  b : Int,
+  b : Int32,
   v : Json,
-  path : Array[@lang.Seg],
-  depth : Int,
+  path : Array[@view.Seg],
+  depth : Int32,
 ) -> String {
-  let children : Array[(@lang.Seg, String, Json)] = match v {
+  let children : Array[(@view.Seg, String, Json)] = match v {
     Array(items) => items.mapi((i, item) => (Idx(i), i.to_string(), item))
     Object(fields) => fields.to_array().map(f => (Key(f.0), f.0, f.1))
     _ =>

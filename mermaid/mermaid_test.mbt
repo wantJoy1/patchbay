@@ -1,5 +1,5 @@
 ///|
-fn count(svg : String, needle : String) -> Int {
+fn count(svg : String, needle : String) -> Int32 {
   svg.split(needle).count() - 1
 }
 

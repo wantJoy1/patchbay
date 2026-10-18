@@ -4,9 +4,8 @@ package "wantJoy1/patchbay/app"
 import {
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
-  "wantJoy1/patchbay/action",
-  "wantJoy1/patchbay/lang",
   "wantJoy1/patchbay/program",
+  "wantJoy1/patchbay/view",
 }
 
 // Values
@@ -49,7 +48,7 @@ pub(all) enum Request {
 } derive(@debug.Debug, @json.FromJson)
 
 pub(all) enum UiAction {
-  Gui(Int, @action.GuiAction)
+  Gui(Int, @view.GuiAction)
   OpenMenu(Int, Int, Int)
   CloseMenu
   ToggleRow(Int, Int)
@@ -58,7 +57,7 @@ pub(all) enum UiAction {
   CopySelection(Int)
   CopyText(String)
   SetLayout(Int, Layout)
-  SetCopyFormat(@lang.Format)
+  SetCopyFormat(@view.Format)
   ShowAllRows(Int)
   SelectProgram(Int)
   UseInput(String)

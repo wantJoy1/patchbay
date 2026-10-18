@@ -1,22 +1,19 @@
 ///|
 pub(all) enum GuiAction {
   SortColumn(String)
-  Filter(Array[@lang.Seg], @lang.CmpOp, Json)
+  Filter(Array[Seg], CmpOp, Json)
   HideColumn(String)
   KeepColumns(Array[String])
-  KeepRows(Array[Int])
-  Drill(Array[@lang.Seg])
-  Append(@lang.Command)
-  RemoveStage(Int)
+  KeepRows(Array[Int32])
+  Drill(Array[Seg])
+  Append(Command)
+  RemoveStage(Int32)
 } derive(Eq, Debug)
 
 ///|
 /// Why not always add a stage: clicking a header twice would give
 /// `sort-by age | sort-by age` rather than `sort-by age --reverse`.
-pub fn apply(
-  p : Array[@lang.Command],
-  action : GuiAction,
-) -> Array[@lang.Command] {
+pub fn apply(p : Array[Command], action : GuiAction) -> Array[Command] {
   let init = if p.is_empty() { [] } else { p[:p.length() - 1].to_owned() }
   let replace_last = cmd => [..init, cmd]
   let push = cmd => [..p, cmd]
@@ -71,12 +68,12 @@ pub fn apply(
 }
 
 ///|
-fn remove(p : Array[@lang.Command], i : Int) -> Array[@lang.Command] {
+fn remove(p : Array[Command], i : Int32) -> Array[Command] {
   [..p[:i], ..p[i + 1:]]
 }
 
 ///|
-fn effective_sort(p : Array[@lang.Command]) -> (Int, Array[String], Bool)? {
+fn effective_sort(p : Array[Command]) -> (Int32, Array[String], Bool)? {
   for i = p.length() - 1; i >= 0; i = i - 1 {
     match p[i] {
       SortBy(cols, reverse~) => return Some((i, cols, reverse))
@@ -89,7 +86,7 @@ fn effective_sort(p : Array[@lang.Command]) -> (Int, Array[String], Bool)? {
 }
 
 ///|
-pub fn sort_state(p : Array[@lang.Command]) -> (String, Bool)? {
+pub fn sort_state(p : Array[Command]) -> (String, Bool)? {
   match effective_sort(p) {
     Some((_, [col], reverse)) => Some((col, reverse))
     _ => None

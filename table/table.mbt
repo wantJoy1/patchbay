@@ -22,7 +22,7 @@ pub fn field(v : Json, name : String) -> Json? {
 }
 
 ///|
-pub fn index(v : Json, i : Int) -> Json? {
+pub fn index(v : Json, i : Int32) -> Json? {
   guard v is Array(items) else { return None }
   items.get(if i < 0 { items.length() + i } else { i })
 }
@@ -43,7 +43,7 @@ pub fn columns(rows : Array[Json]) -> Array[String]? {
 }
 
 ///|
-fn rank(v : Json) -> Int {
+fn rank(v : Json) -> Int32 {
   match v {
     Null => 0
     True | False => 1
@@ -55,7 +55,7 @@ fn rank(v : Json) -> Int {
 }
 
 ///|
-pub fn compare(a : Json, b : Json) -> Int {
+pub fn compare(a : Json, b : Json) -> Int32 {
   match (a, b) {
     (Number(x, ..), Number(y, ..)) => x.compare(y)
     // Why not `String::compare`: it orders by length first.
@@ -69,7 +69,11 @@ pub fn compare(a : Json, b : Json) -> Int {
 }
 
 ///|
-fn[T] compare_lists(xs : Array[T], ys : Array[T], cmp : (T, T) -> Int) -> Int {
+fn[T] compare_lists(
+  xs : Array[T],
+  ys : Array[T],
+  cmp : (T, T) -> Int32,
+) -> Int32 {
   for i in 0..<@cmp.minimum(xs.length(), ys.length()) {
     let c = cmp(xs[i], ys[i])
     if c != 0 {
@@ -110,10 +114,10 @@ pub fn infer(s : String) -> Json {
     re"^true$" => true
     re"^false$" => false
     re"^(\+|-)?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE](\+|-)?[0-9]+)?$" =>
-      Json::number(@string.parse_double(s)) catch {
-        _ => Json::string(s)
+      Json(@string.parse_double(s)) catch {
+        _ => Json(s)
       }
-    _ => Json::string(s)
+    _ => Json(s)
   }
 }
 
@@ -182,9 +186,9 @@ pub fn to_delimited(v : Json, sep : Char) -> String {
 ///|
 pub fn parse_delimited(text : String, sep : Char) -> Json {
   guard split_delimited(text, sep) is [header, .. body] else { return [] }
-  Json::array(
+  Json(
     body.map(cells => {
-      Json::object(
+      Json(
         Map::from_array(
           header.mapi((i, name) => (name, infer(cells.get(i).unwrap_or("")))),
         ),

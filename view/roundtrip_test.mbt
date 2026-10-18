@@ -13,15 +13,15 @@ fn pick(r : @random.Rand, xs : Array[String]) -> String {
 }
 
 ///|
-fn gen_value(r : @random.Rand, depth : Int) -> Json {
+fn gen_value(r : @random.Rand, depth : Int32) -> Json {
   match r.int(limit=if depth > 1 { 4 } else { 6 }) {
     0 => null
-    1 => Json::boolean(r.boolean())
-    2 => Json::number((r.int(limit=2001) - 1000).to_double() / 4.0)
-    3 => Json::string(pick(r, tricky_names))
-    4 => Json::array(Array::makei(r.int(limit=3), _ => gen_value(r, depth + 1)))
+    1 => Json(r.boolean())
+    2 => Json((r.int(limit=2001) - 1000).to_double() / 4.0)
+    3 => Json(pick(r, tricky_names))
+    4 => Json(Array::makei(r.int(limit=3), _ => gen_value(r, depth + 1)))
     _ =>
-      Json::object(
+      Json(
         Map::from_array(
           Array::makei(r.int(limit=3), _ => {
             (pick(r, tricky_names), gen_value(r, depth + 1))
@@ -32,25 +32,25 @@ fn gen_value(r : @random.Rand, depth : Int) -> Json {
 }
 
 ///|
-fn gen_path(r : @random.Rand) -> Array[@lang.Seg] {
+fn gen_path(r : @random.Rand) -> Array[@view.Seg] {
   match r.int(limit=3) {
     0 => []
     1 => [Key(pick(r, tricky_names))]
     _ =>
       Array::makei(1 + r.int(limit=3), _ => {
         if r.boolean() {
-          @lang.Seg::Key(
+          @view.Seg::Key(
             pick(r, if r.boolean() { path_keys } else { tricky_names }),
           )
         } else {
-          @lang.Seg::Idx(r.int(limit=10))
+          @view.Seg::Idx(r.int(limit=10))
         }
       })
   }
 }
 
 ///|
-let ops : Array[@lang.CmpOp] = [
+let ops : Array[@view.CmpOp] = [
   Eq,
   Ne,
   Lt,
@@ -64,7 +64,7 @@ let ops : Array[@lang.CmpOp] = [
 ]
 
 ///|
-fn gen_cond(r : @random.Rand, depth : Int) -> @lang.Cond {
+fn gen_cond(r : @random.Rand, depth : Int32) -> @view.Cond {
   match r.int(limit=if depth > 2 { 1 } else { 4 }) {
     0 => Cmp(gen_path(r), ops[r.int(limit=ops.length())], gen_value(r, 2))
     1 => And(gen_cond(r, depth + 1), gen_cond(r, depth + 1))
@@ -79,7 +79,7 @@ fn gen_names(r : @random.Rand) -> Array[String] {
 }
 
 ///|
-fn gen_command(r : @random.Rand) -> @lang.Command {
+fn gen_command(r : @random.Rand) -> @view.Command {
   match r.int(limit=18) {
     0 => SortBy(gen_names(r), reverse=r.boolean())
     1 => Sort(reverse=r.boolean())
@@ -97,9 +97,9 @@ fn gen_command(r : @random.Rand) -> @lang.Command {
     10 => Length
     11 => Reverse
     12 => Uniq
-    13 => From([@lang.Format::Json, Csv, Tsv][r.int(limit=3)])
-    14 => To([@lang.Format::Json, Csv, Tsv, Md][r.int(limit=4)])
-    15 => Math([@lang.MathOp::Sum, Avg, Min, Max][r.int(limit=4)])
+    13 => From([@view.Format::Json, Csv, Tsv][r.int(limit=3)])
+    14 => To([@view.Format::Json, Csv, Tsv, Md][r.int(limit=4)])
+    15 => Math([@view.MathOp::Sum, Avg, Min, Max][r.int(limit=4)])
     16 => Find(pick(r, tricky_names))
     _ => Parse("{" + pick(r, path_keys) + "} - {rest}")
   }
@@ -107,11 +107,11 @@ fn gen_command(r : @random.Rand) -> @lang.Command {
 
 ///|
 test "print then parse is the identity on random pipelines" {
-  let r = @random.Rand::new()
+  let r = @random.Rand()
   for _ in 0..<2000 {
     let p = Array::makei(1 + r.int(limit=4), _ => gen_command(r))
-    let printed = @lang.print(p)
-    let back = @lang.parse(printed) catch {
+    let printed = @view.print(p)
+    let back = @view.parse(printed) catch {
       e => fail("does not parse: \{printed}\n\{e.message()}")
     }
     if back != p {

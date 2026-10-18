@@ -1,7 +1,7 @@
 ///|
 pub(all) enum Seg {
   Key(String)
-  Idx(Int)
+  Idx(Int32)
 } derive(Eq, Debug)
 
 ///|
@@ -48,12 +48,12 @@ pub(all) enum Command {
   Sort(reverse~ : Bool)
   Where(Cond)
   Select(Array[String])
-  SelectRows(Array[Int])
+  SelectRows(Array[Int32])
   Reject(Array[String])
   Get(Array[Seg])
-  First(Int?)
-  Last(Int?)
-  Skip(Int)
+  First(Int32?)
+  Last(Int32?)
+  Skip(Int32)
   Length
   Reverse
   Uniq
@@ -111,12 +111,12 @@ fn[T : Eq] name_of(table : Array[(String, T)], x : T) -> String {
 }
 
 ///|
-fn[T] lookup(table : Array[(String, T)], name : String) -> T? {
+fn[T] named(table : Array[(String, T)], name : String) -> T? {
   table.iter().find_first(e => e.0 == name).map(e => e.1)
 }
 
 ///|
-pub fn CmpOp::symbol(self : CmpOp) -> String {
+fn CmpOp::symbol(self : CmpOp) -> String {
   name_of(cmp_ops, self)
 }
 
@@ -126,6 +126,6 @@ pub fn Format::name(self : Format) -> String {
 }
 
 ///|
-pub fn MathOp::name(self : MathOp) -> String {
+fn MathOp::name(self : MathOp) -> String {
   name_of(math_ops, self)
 }

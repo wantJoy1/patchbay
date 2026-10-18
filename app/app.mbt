@@ -7,38 +7,38 @@ pub(all) enum Layout {
 
 ///|
 pub(all) enum UiAction {
-  Gui(Int, @action.GuiAction)
-  OpenMenu(Int, Int, Int)
+  Gui(Int32, @view.GuiAction)
+  OpenMenu(Int32, Int32, Int32)
   CloseMenu
-  ToggleRow(Int, Int)
-  SelectAllRows(Int)
-  ClearSelection(Int)
-  CopySelection(Int)
+  ToggleRow(Int32, Int32)
+  SelectAllRows(Int32)
+  ClearSelection(Int32)
+  CopySelection(Int32)
   CopyText(String)
-  SetLayout(Int, Layout)
-  SetCopyFormat(@lang.Format)
-  ShowAllRows(Int)
-  SelectProgram(Int)
+  SetLayout(Int32, Layout)
+  SetCopyFormat(@view.Format)
+  ShowAllRows(Int32)
+  SelectProgram(Int32)
   UseInput(String)
   Send(String)
-  RemoveAttachment(Int)
-  Cancel(Int)
+  RemoveAttachment(Int32)
+  Cancel(Int32)
 } derive(Eq, Debug)
 
 ///|
 priv struct Entry {
-  program : Int
+  program : Int32
   input : @program.Input
   parts : Array[@program.Part]
   mut error : String?
-  blocks : Array[Int]
+  blocks : Array[Int32]
   steps : Array[Entry]
   mut running : Bool
   mut cancel : () -> Unit
 }
 
 ///|
-fn Entry::new(program : Int, input : @program.Input) -> Entry {
+fn Entry::new(program : Int32, input : @program.Input) -> Entry {
   {
     program,
     input,
@@ -59,16 +59,16 @@ fn Entry::reply(self : Entry) -> @program.Reply {
 ///|
 pub struct App {
   priv programs : Array[@program.Program]
-  priv mut current : Int
+  priv mut current : Int32
   priv entries : Array[Entry]
   priv blocks : Array[Block]
   priv pending : Array[@program.Attachment]
-  priv history : Array[(Int, String)]
-  priv mut history_cursor : Int?
+  priv history : Array[(Int32, String)]
+  priv mut history_cursor : Int32?
   priv mut draft : String
   priv mut next_input : String?
-  priv mut menu : (Int, Int, Int)?
-  priv mut copy_format : @lang.Format
+  priv mut menu : (Int32, Int32, Int32)?
+  priv mut copy_format : @view.Format
   priv mut clipboard : String
   priv mut notice : String
   priv mut scroll_to_end : Bool
@@ -76,7 +76,7 @@ pub struct App {
   // unchanged until it changes, so the page can leave it alone.
   priv actions : Map[String, UiAction]
   priv mut scope : String
-  priv mut next_act : Int
+  priv mut next_act : Int32
   priv spawn : (async () -> Unit) -> () -> Unit
   priv changed : (Frame) -> Unit
 }
@@ -171,7 +171,7 @@ async fn App::run(
 }
 
 ///|
-fn App::unseen_by(self : App, p : Int) -> Array[@program.Exchange] {
+fn App::unseen_by(self : App, p : Int32) -> Array[@program.Exchange] {
   let mut since = 0
   for i, e in self.entries {
     if e.program == p {
@@ -190,7 +190,7 @@ fn App::unseen_by(self : App, p : Int) -> Array[@program.Exchange] {
 }
 
 ///|
-fn App::history_step(self : App, delta : Int, text : String) -> Unit {
+fn App::history_step(self : App, delta : Int32, text : String) -> Unit {
   let own = self.history.filter(h => h.0 == self.current).map(h => h.1)
   let next = match self.history_cursor {
     None if delta < 0 && !own.is_empty() => {
@@ -208,21 +208,21 @@ fn App::history_step(self : App, delta : Int, text : String) -> Unit {
 }
 
 ///|
-fn App::close_menu_of(self : App, b : Int) -> Unit {
+fn App::close_menu_of(self : App, b : Int32) -> Unit {
   if self.menu is Some((mb, _, _)) && mb == b {
     self.menu = None
   }
 }
 
 ///|
-fn App::set_view(self : App, b : Int, src : String) -> Unit {
+fn App::set_view(self : App, b : Int32, src : String) -> Unit {
   if self.blocks.get(b) is Some(block) && block.set_view_text(src) {
     self.close_menu_of(b)
   }
 }
 
 ///|
-fn App::apply(self : App, b : Int, action : @action.GuiAction) -> Unit {
+fn App::apply(self : App, b : Int32, action : @view.GuiAction) -> Unit {
   guard self.blocks.get(b) is Some(block) else { return }
   match block.apply(action) {
     Ok(true) => self.close_menu_of(b)

@@ -21,8 +21,8 @@ pub async fn nushell(group : @async.TaskGroup[Unit]) -> @program.Program {
     id += 1
     let request : Json = {
       "jsonrpc": "2.0",
-      "id": id.to_json(),
-      "method": name.to_json(),
+      "id": Json(id),
+      "method": Json(name),
       "params": params,
     }
     to_nu.write(request.stringify() + "\n")
@@ -46,14 +46,14 @@ pub async fn nushell(group : @async.TaskGroup[Unit]) -> @program.Program {
         let notice : Json = {
           "jsonrpc": "2.0",
           "method": "notifications/cancelled",
-          "params": { "requestId": current.to_json() },
+          "params": { "requestId": Json(current) },
         }
         to_nu.write(notice.stringify() + "\n")
       })
     })
     call("tools/call", {
       "name": "evaluate",
-      "arguments": { "input": code.to_json() },
+      "arguments": { "input": Json(code) },
     })
   }
 

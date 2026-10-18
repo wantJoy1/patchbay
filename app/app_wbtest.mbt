@@ -1,5 +1,8 @@
 ///|
-async fn with_app(f : async (App) -> Unit) -> Unit {
+async fn with_app(
+  f : async (App) -> Unit,
+  changed~ : (Frame) -> Unit = _ => (),
+) -> Unit {
   let fixture : @program.Program = {
     name: "fixture",
     kind: Interpreter(language="nu"),
@@ -21,7 +24,7 @@ async fn with_app(f : async (App) -> Unit) -> Unit {
         let task = group.spawn(job, allow_failure=true)
         () => task.cancel()
       },
-      changed=_ => (),
+      changed~,
     )
     f(app)
   })
@@ -46,7 +49,7 @@ fn html(app : App) -> String {
 }
 
 ///|
-async fn click(app : App, action : UiAction, shift? : Bool = false) -> Unit {
+async fn click(app : App, action : UiAction, shift~ : Bool = false) -> Unit {
   app.render() |> ignore
   match app.actions.iter().find_first(kv => kv.1 == action) {
     Some((id, _)) => app.dispatch(id, shift~)
@@ -56,7 +59,7 @@ async fn click(app : App, action : UiAction, shift? : Bool = false) -> Unit {
 }
 
 ///|
-fn view_of(app : App, b : Int) -> String {
+fn view_of(app : App, b : Int32) -> String {
   app.blocks[b].view_text
 }
 
@@ -350,7 +353,7 @@ async test "an entry renders the same until it changes" {
 }
 
 ///|
-async test "a list has a value header and a record field and value headers" {
+async test "a list has a value column and a record field and value columns" {
   with_app(app => {
     send(app, "users")
     app.set_view(0, "get name")
@@ -361,7 +364,7 @@ async test "a list has a value header and a record field and value headers" {
 }
 
 ///|
-async test "an agent receives the exchanges it has not seen" {
+async test "an agent receives only the exchanges it has not seen yet" {
   with_app(app => {
     send(app, "users")
     click(app, SelectProgram(1))
@@ -407,17 +410,9 @@ async test "a running input shows as running and can be cancelled" {
 ///|
 async test "frames follow the output as it arrives" {
   let frames = []
-  @async.with_task_group(group => {
-    let app = App::new(
-      [@mock.agent()],
-      spawn=job => {
-        let task = group.spawn(job)
-        () => task.cancel()
-      },
-      changed=frame => frames.push(frame.html),
-    )
-    app.send("表と図")
-    settle(app)
+  with_app(changed=frame => frames.push(frame.html), app => {
+    click(app, SelectProgram(1))
+    send(app, "表と図")
   })
   assert_true(frames.length() >= 2 && frames.last().unwrap().contains("<svg"))
 }

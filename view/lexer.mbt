@@ -1,6 +1,6 @@
 ///|
 pub suberror ParseError {
-  ParseError(pos~ : Int, String)
+  ParseError(pos~ : Int32, String)
 } derive(Debug)
 
 ///|
@@ -39,7 +39,7 @@ fn is_delimiter(c : Char) -> Bool {
 }
 
 ///|
-fn tokenize(src : String) -> Array[(Tok, Int)] raise ParseError {
+fn tokenize(src : String) -> Array[(Tok, Int32)] raise ParseError {
   let tokens = []
   let mut rest = src[:]
   while rest is [c, ..] {
@@ -101,7 +101,7 @@ fn word_token(w : StringView) -> Tok {
 ///|
 /// Why not unescape by hand: the printer writes strings as JSON, so JSON
 /// decodes exactly what it writes.
-fn quoted(s : StringView, pos : Int) -> (String, StringView) raise ParseError {
+fn quoted(s : StringView, pos : Int32) -> (String, StringView) raise ParseError {
   lexmatch s with longest {
     (re"^\"([^\"\\]|\\.)*\"" as q, after=r) => {
       // Why not hand raw line breaks to JSON: it rejects them, but strings

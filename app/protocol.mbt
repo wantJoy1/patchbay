@@ -3,10 +3,10 @@ pub(all) enum Request {
   Init
   Send(text~ : String)
   Act(id~ : String, shift~ : Bool)
-  View(block~ : Int, text~ : String)
-  Copy(block~ : Int, rows~ : Array[Int], cols~ : Array[Int])
+  View(block~ : Int32, text~ : String)
+  Copy(block~ : Int32, rows~ : Array[Int32], cols~ : Array[Int32])
   Attach(name~ : String, media_type~ : String, data~ : String)
-  History(delta~ : Int, text~ : String)
+  History(delta~ : Int32, text~ : String)
   Escape
   Open(url~ : String)
 } derive(FromJson, Debug)

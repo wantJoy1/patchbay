@@ -64,10 +64,10 @@ pub fn split(md : String) -> Array[Block] {
         flush()
         blocks.push(
           Table(
-            Json::array(
+            Json(
               rows.map(row => {
                 let cells = row_cells(row)
-                Json::object(
+                Json(
                   Map::from_array(
                     header.mapi((c, name) => {
                       (
@@ -121,7 +121,7 @@ pub fn split(md : String) -> Array[Block] {
 }
 
 ///|
-fn heading(line : StringView) -> (Int, String)? {
+fn heading(line : StringView) -> (Int32, String)? {
   lexmatch line with longest {
     (re"^#{1,6} +" as marks, after=text) =>
       Some((marks.trim_end(chars=" ").length(), text.to_owned()))

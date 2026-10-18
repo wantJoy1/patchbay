@@ -8,12 +8,12 @@ fn is_bare_safe(s : String) -> Bool {
 }
 
 ///|
-pub fn quote_string(s : String) -> String {
-  Json::string(s).stringify()
+fn quote_string(s : String) -> String {
+  Json::Json(s).stringify()
 }
 
 ///|
-pub fn print_name(s : String) -> String {
+fn print_name(s : String) -> String {
   if is_bare_safe(s) {
     s
   } else {
@@ -22,7 +22,7 @@ pub fn print_name(s : String) -> String {
 }
 
 ///|
-pub fn print_path(path : Array[Seg]) -> String {
+fn print_path(path : Array[Seg]) -> String {
   let bare = (k : String) => is_bare_safe(k) && !k.contains_char('.')
   let text = path
     .map(seg => {
@@ -44,7 +44,7 @@ pub fn print_path(path : Array[Seg]) -> String {
 }
 
 ///|
-fn cond_precedence(c : Cond) -> Int {
+fn cond_precedence(c : Cond) -> Int32 {
   match c {
     Or(_, _) => 0
     And(_, _) => 1
@@ -53,7 +53,7 @@ fn cond_precedence(c : Cond) -> Int {
 }
 
 ///|
-pub fn print_cond(c : Cond) -> String {
+fn print_cond(c : Cond) -> String {
   let sub = (inner, min) => {
     let text = print_cond(inner)
     if cond_precedence(inner) < min {
@@ -74,7 +74,7 @@ pub fn print_cond(c : Cond) -> String {
 pub fn print_command(cmd : Command) -> String {
   let names = (xs : Array[String]) => xs.map(print_name).join(" ")
   let reversed = (r : Bool) => if r { " --reverse" } else { "" }
-  let count = (n : Int?) => n.map(n => " \{n}").unwrap_or("")
+  let count = (n : Int32?) => n.map(n => " \{n}").unwrap_or("")
   match cmd {
     SortBy(cols, reverse~) => "sort-by \{names(cols)}\{reversed(reverse)}"
     Sort(reverse~) => "sort\{reversed(reverse)}"

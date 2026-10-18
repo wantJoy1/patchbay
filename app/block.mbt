@@ -13,19 +13,19 @@ priv enum Content {
 priv struct Block {
   content : Content
   output : Json
-  mut view : Array[@lang.Command]
+  mut view : Array[@view.Command]
   mut view_text : String
   mut view_error : String?
-  mut failed_stage : Int?
+  mut failed_stage : Int32?
   mut shown : Json
-  selected : Array[Int]
-  mut anchor : Int?
+  selected : Array[Int32]
+  mut anchor : Int32?
   mut layout : Layout
   mut show_all : Bool
 }
 
 ///|
-fn Block::new(content : Content, output? : Json = null) -> Block {
+fn Block::new(content : Content, output~ : Json = null) -> Block {
   {
     content,
     output,
@@ -55,7 +55,7 @@ fn blocks_of(part : @program.Part) -> Array[Block] {
     Mermaid(code) => [Block::new(Diagram(code))]
     Html(html) => [Block::new(Page(html))]
     Data(v) => [Block::new(Data, output=v)]
-    Text(s) => [Block::new(Data, output=Json::string(s))]
+    Text(s) => [Block::new(Data, output=Json::Json(s))]
     Image(src) => [Block::new(Image(src))]
     Audio(src) => [Block::new(Audio(src))]
     File(data, name~, media_type~) =>
@@ -66,7 +66,7 @@ fn blocks_of(part : @program.Part) -> Array[Block] {
 ///|
 fn Block::set_view_text(self : Block, src : String) -> Bool {
   self.view_text = src
-  let view = @lang.parse(src) catch {
+  let view = @view.parse(src) catch {
     e => {
       self.view_error = Some(e.message())
       self.failed_stage = None
@@ -77,9 +77,9 @@ fn Block::set_view_text(self : Block, src : String) -> Bool {
 }
 
 ///|
-fn Block::run(self : Block, view : Array[@lang.Command]) -> Bool {
+fn Block::run(self : Block, view : Array[@view.Command]) -> Bool {
   self.view = view
-  let value = @eval.run(view, self.output) catch {
+  let value = @view.run(view, self.output) catch {
     e => {
       self.view_error = Some(e.message())
       self.failed_stage = Some(e.stage())
@@ -100,23 +100,20 @@ fn Block::run(self : Block, view : Array[@lang.Command]) -> Bool {
 /// Why not apply while the view has an error: the shown value is stale, so the
 /// action would rewrite something else than what is seen. Removing the failing
 /// stage is allowed as a way to fix it.
-fn Block::apply(
-  self : Block,
-  action : @action.GuiAction,
-) -> Result[Bool, String] {
+fn Block::apply(self : Block, action : @view.GuiAction) -> Result[Bool, String] {
   if self.view_error is Some(_) &&
     !(action is RemoveStage(_) && self.failed_stage is Some(_)) {
     return Err(
       "表示の変換のエラーを直してから操作してください",
     )
   }
-  let view = @action.apply(self.view, action)
-  self.view_text = @lang.print(view)
+  let view = @view.apply(self.view, action)
+  self.view_text = @view.print(view)
   Ok(self.run(view))
 }
 
 ///|
-fn Block::toggle_row(self : Block, r : Int, shift~ : Bool) -> Unit {
+fn Block::toggle_row(self : Block, r : Int32, shift~ : Bool) -> Unit {
   match (shift, self.anchor) {
     (true, Some(a)) =>
       for i in @cmp.minimum(a, r)..<=@cmp.maximum(a, r) {
@@ -159,7 +156,7 @@ fn shape_of(v : Json) -> Shape {
 }
 
 ///|
-fn Block::row_count(self : Block) -> Int {
+fn Block::row_count(self : Block) -> Int32 {
   match shape_of(self.shown) {
     Rows(rows, _) | Items(rows) => rows.length()
     Fields(fields) => fields.length()
@@ -170,10 +167,10 @@ fn Block::row_count(self : Block) -> Int {
 ///|
 fn Block::sub_value(
   self : Block,
-  rows : Array[Int],
-  cols : Array[Int]?,
+  rows : Array[Int32],
+  cols : Array[Int32]?,
 ) -> Json? {
-  let record = fields => Json::object(Map::from_array(fields))
+  let record = fields => Json::Json(Map::from_array(fields))
   match shape_of(self.shown) {
     Rows(items, columns) => {
       let picked = rows.filter_map(r => items.get(r))
@@ -182,19 +179,19 @@ fn Block::sub_value(
         None => columns
       }
       Some(
-        Json::array(
+        Json::Json(
           picked.map(row => {
             record(names.map(n => (n, @table.field(row, n).unwrap_or(null))))
           }),
         ),
       )
     }
-    Items(items) => Some(Json::array(rows.filter_map(r => items.get(r))))
+    Items(items) => Some(Json::Json(rows.filter_map(r => items.get(r))))
     Fields(fields) => {
       let picked = rows.filter_map(r => fields.get(r))
       match cols {
-        Some([0]) => Some(Json::array(picked.map(f => Json::string(f.0))))
-        Some([1]) => Some(Json::array(picked.map(f => f.1)))
+        Some([0]) => Some(Json::Json(picked.map(f => Json::Json(f.0))))
+        Some([1]) => Some(Json::Json(picked.map(f => f.1)))
         _ => Some(record(picked))
       }
     }
@@ -203,10 +200,10 @@ fn Block::sub_value(
 }
 
 ///|
-fn Block::selection_text(self : Block, format : @lang.Format) -> String {
+fn Block::selection_text(self : Block, format : @view.Format) -> String {
   self
   .sub_value(self.selected, None)
-  .map(v => @eval.serialize(v, format))
+  .map(v => @view.serialize(v, format))
   .unwrap_or("")
 }
 
@@ -215,15 +212,15 @@ fn Block::selection_text(self : Block, format : @lang.Format) -> String {
 /// wrapping, not the data behind the cells.
 fn Block::copy_cells(
   self : Block,
-  rows : Array[Int],
-  cols : Array[Int],
-  format : @lang.Format,
+  rows : Array[Int32],
+  cols : Array[Int32],
+  format : @view.Format,
 ) -> String {
   guard self.sub_value(rows, Some(cols)) is Some(sub) && !rows.is_empty() else {
     return ""
   }
   guard rows.length() == 1 && cols.length() == 1 else {
-    return @eval.serialize(sub, format)
+    return @view.serialize(sub, format)
   }
   let cell = match sub {
     Array([Object(fields)]) => fields.values().next().unwrap_or(null)

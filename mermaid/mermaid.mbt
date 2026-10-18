@@ -232,7 +232,7 @@ fn Flowchart::render(
   let dag = []
   let visited = Array::make(n, false)
   let active = Array::make(n, false)
-  fn visit(u : Int) -> Unit {
+  fn visit(u : Int32) -> Unit {
     visited[u] = true
     active[u] = true
     for p in pairs {
@@ -258,15 +258,15 @@ fn Flowchart::render(
       layer[p.1] = layer[p.1].max(layer[p.0] + 1)
     }
   }
-  let rows : Array[Array[Int]] = Array::makei(
-    layer.fold(init=0, Int::max) + 1,
+  let rows : Array[Array[Int32]] = Array::makei(
+    layer.fold(init=0, Int32::max) + 1,
     _ => [],
   )
   for v in 0..<n {
     rows[layer[v]].push(v)
   }
   let pos = Array::makei(n, v => v)
-  fn reorder(row : Array[Int], links : Array[(Int, Int)]) {
+  fn reorder(row : Array[Int32], links : Array[(Int32, Int32)]) {
     row.sort_by_key(v => {
       let near = links.filter_map(l => {
         if l.1 == v {
@@ -350,7 +350,7 @@ fn Flowchart::render(
       "<text x=\"\{num(x)}\" y=\"\{num(y)}\">\{escape(label)}</text>",
     )
   }
-  fn clip(v : Int, toward : Int) -> (Double, Double) {
+  fn clip(v : Int32, toward : Int32) -> (Double, Double) {
     let (x, y) = centre[v]
     let (dx, dy) = (centre[toward].0 - x, centre[toward].1 - y)
     let s = (size[v].0 / 2.0 / dx.abs()).min(size[v].1 / 2.0 / dy.abs())

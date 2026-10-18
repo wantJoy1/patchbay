@@ -1,8 +1,6 @@
 import {
   "wantJoy1/patchbay/table",
-  "wantJoy1/patchbay/lang",
-  "wantJoy1/patchbay/eval",
-  "wantJoy1/patchbay/action",
+  "wantJoy1/patchbay/view",
   "wantJoy1/patchbay/program",
   "wantJoy1/patchbay/markdown",
   "wantJoy1/patchbay/mermaid",

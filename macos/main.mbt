@@ -3,7 +3,7 @@
 extern "C" fn open_window(page : Bytes) -> Unit = "patchbay_open"
 
 ///|
-extern "C" fn poll_cocoa(timeout : Int) -> Unit = "patchbay_poll"
+extern "C" fn poll_cocoa(timeout : Int32) -> Unit = "patchbay_poll"
 
 ///|
 extern "C" fn wakeup() -> Unit = "patchbay_wakeup"

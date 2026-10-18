@@ -92,7 +92,7 @@ let replies : Array[(Array[String], () -> @program.Part)] = [
 ]
 
 ///|
-fn help_reply(turn : Int) -> String {
+fn help_reply(turn : Int32) -> String {
   (
     $|これはエージェントのモックです（このセッションで \{turn} 回目の入力）。
     $|
@@ -191,7 +191,7 @@ fn wav_data_url() -> String {
   let n = rate / 2
   let buf = Buffer()
   let u32 = x => buf.write_int_le(x)
-  let u16 = (x : Int) => buf.write_int16_le(Int16::from_int(x))
+  let u16 = (x : Int32) => buf.write_int16_le(Int16::from_int(x))
   buf.write_string_utf8("RIFF")
   u32(36 + n)
   buf.write_string_utf8("WAVEfmt ")

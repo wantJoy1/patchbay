@@ -1,6 +1,6 @@
 ///|
 pub suberror EvalError {
-  EvalError(stage~ : Int, String)
+  EvalError(stage~ : Int32, String)
 } derive(Debug)
 
 ///|
@@ -10,7 +10,7 @@ pub fn EvalError::message(self : EvalError) -> String {
 }
 
 ///|
-pub fn EvalError::stage(self : EvalError) -> Int {
+pub fn EvalError::stage(self : EvalError) -> Int32 {
   let EvalError(stage~, _) = self
   stage
 }
@@ -24,13 +24,10 @@ priv suberror CmdError {
 pub fn run(p : Array[Command], input : Json) -> Json raise EvalError {
   let mut v = input
   for i, cmd in p {
-    v = apply(cmd, v) catch { CmdError(msg) => raise EvalError(stage=i, msg) }
+    v = step(cmd, v) catch { CmdError(msg) => raise EvalError(stage=i, msg) }
   }
   v
 }
-
-///|
-using @lang {type Command, type Format}
 
 ///|
 fn expect_list(v : Json, cmd : String) -> Array[Json] raise CmdError {
@@ -57,7 +54,7 @@ fn parse_as(text : String, format : Format) -> Json raise CmdError {
       }
     Csv => @table.parse_delimited(text, ',')
     Tsv => @table.parse_delimited(text, '\t')
-    Md => Json::string(text)
+    Md => Json::Json(text)
   }
 }
 
@@ -73,7 +70,7 @@ pub fn serialize(v : Json, format : Format) -> String {
 
 ///|
 fn record(fields : Array[(String, Json)]) -> Json {
-  Json::object(Map::from_array(fields))
+  Json::Json(Map::from_array(fields))
 }
 
 ///|
@@ -84,7 +81,7 @@ fn map_rows(
 ) -> Json raise CmdError {
   match v {
     Array(items) =>
-      Json::array(items.map(row => if row is Object(r) { f(r) } else { row }))
+      Json::Json(items.map(row => if row is Object(r) { f(r) } else { row }))
     Object(r) => f(r)
     _ =>
       raise CmdError(
@@ -110,19 +107,19 @@ fn sorted(items : Array[Json], reverse : Bool, key : (Json) -> Json) -> Json {
       a.0.compare(b.0)
     }
   })
-  Json::array(indexed.map(p => p.1))
+  Json::Json(indexed.map(p => p.1))
 }
 
 ///|
-fn apply(cmd : Command, input : Json) -> Json raise CmdError {
+fn step(cmd : Command, input : Json) -> Json raise CmdError {
   match cmd {
     SortBy(columns, reverse~) =>
       sorted(expect_list(input, "sort-by"), reverse, row => {
-        Json::array(columns.map(c => @table.field(row, c).unwrap_or(null)))
+        Json::Json(columns.map(c => @table.field(row, c).unwrap_or(null)))
       })
     Sort(reverse~) => sorted(expect_list(input, "sort"), reverse, v => v)
     Where(cond) =>
-      Json::array(
+      Json::Json(
         expect_list(input, "where").filter(row => test_cond(cond, row)),
       )
     Select(columns) =>
@@ -131,7 +128,7 @@ fn apply(cmd : Command, input : Json) -> Json raise CmdError {
       })
     SelectRows(rows) => {
       let items = expect_list(input, "select")
-      Json::array(rows.filter_map(i => items.get(i)))
+      Json::Json(rows.filter_map(i => items.get(i)))
     }
     Reject(columns) =>
       map_rows(input, "reject", r => {
@@ -139,21 +136,21 @@ fn apply(cmd : Command, input : Json) -> Json raise CmdError {
       })
     Get(path) =>
       lookup(input, path).unwrap_or_error(
-        CmdError("cannot find \{@lang.print_path(path)}"),
+        CmdError("cannot find \{print_path(path)}"),
       )
     First(n) => take(input, n, from_end=false)
     Last(n) => take(input, n, from_end=true)
-    Skip(n) => Json::array(expect_list(input, "skip").iter().drop(n).collect())
+    Skip(n) => Json::Json(expect_list(input, "skip").iter().drop(n).collect())
     Length =>
       match input {
-        Array(items) => Json::number(items.length().to_double())
-        Object(fields) => Json::number(fields.length().to_double())
+        Array(items) => Json::Json(items.length())
+        Object(fields) => Json::Json(fields.length())
         _ =>
           raise CmdError(
             "length expects a list, got \{@table.type_name(input)}",
           )
       }
-    Reverse => Json::array(expect_list(input, "reverse").rev())
+    Reverse => Json::Json(expect_list(input, "reverse").rev())
     Uniq => {
       let out = []
       for item in expect_list(input, "uniq") {
@@ -161,7 +158,7 @@ fn apply(cmd : Command, input : Json) -> Json raise CmdError {
           out.push(item)
         }
       }
-      Json::array(out)
+      Json::Json(out)
     }
     Columns => {
       let names = match input {
@@ -172,13 +169,12 @@ fn apply(cmd : Command, input : Json) -> Json raise CmdError {
             "columns expects a table or record, got \{@table.type_name(input)}",
           )
       }
-      Json::array(names.map(Json::string))
+      Json::Json(names)
     }
-    Lines =>
-      Json::array(split_lines(expect_text(input, "lines")).map(Json::string))
+    Lines => Json::Json(split_lines(expect_text(input, "lines")))
     From(format) =>
       parse_as(expect_text(input, "from \{format.name()}"), format)
-    To(format) => Json::string(serialize(input, format))
+    To(format) => Json::Json(serialize(input, format))
     Math(op) => math(op, expect_list(input, "math \{op.name()}"))
     Parse(pattern) => {
       let lines = match input {
@@ -187,21 +183,20 @@ fn apply(cmd : Command, input : Json) -> Json raise CmdError {
         _ =>
           raise CmdError("parse expects text, got \{@table.type_name(input)}")
       }
-      Json::array(lines.filter_map(line => match_pattern(pattern, line)))
+      Json::Json(lines.filter_map(line => match_pattern(pattern, line)))
     }
     Find(text) => {
-      let needle = text.to_lower()
       let rows = match input {
-        String(s) => split_lines(s).map(Json::string)
+        String(s) => split_lines(s).map(line => Json::Json(line))
         _ => expect_list(input, "find")
       }
-      Json::array(rows.filter(row => contains_text(row, needle)))
+      Json::Json(rows.filter(row => contains_text(row, text, ignore_case=true)))
     }
   }
 }
 
 ///|
-fn take(input : Json, n : Int?, from_end~ : Bool) -> Json raise CmdError {
+fn take(input : Json, n : Int32?, from_end~ : Bool) -> Json raise CmdError {
   let name = if from_end { "last" } else { "first" }
   let items = expect_list(input, name)
   match n {
@@ -211,7 +206,7 @@ fn take(input : Json, n : Int?, from_end~ : Bool) -> Json raise CmdError {
       )
     Some(n) => {
       let n = @cmp.minimum(n, items.length())
-      Json::array(
+      Json::Json(
         if from_end {
           items[items.length() - n:].to_owned()
         } else {
@@ -225,7 +220,7 @@ fn take(input : Json, n : Int?, from_end~ : Bool) -> Json raise CmdError {
 ///|
 /// Why not fail on a key applied to a list: mapping it over the rows makes
 /// `get name` on a table give the column.
-pub fn lookup(v : Json, path : ArrayView[@lang.Seg]) -> Json? {
+fn lookup(v : Json, path : ArrayView[Seg]) -> Json? {
   match (path, v) {
     ([], _) => Some(v)
     ([Idx(i), .. rest], _) =>
@@ -238,14 +233,14 @@ pub fn lookup(v : Json, path : ArrayView[@lang.Seg]) -> Json? {
         guard lookup(item, path) is Some(x) else { return None }
         out.push(x)
       }
-      Some(Json::array(out))
+      Some(Json::Json(out))
     }
     _ => None
   }
 }
 
 ///|
-pub fn test_cond(cond : @lang.Cond, row : Json) -> Bool {
+fn test_cond(cond : Cond, row : Json) -> Bool {
   match cond {
     And(a, b) => test_cond(a, row) && test_cond(b, row)
     Or(a, b) => test_cond(a, row) || test_cond(b, row)
@@ -256,13 +251,15 @@ pub fn test_cond(cond : @lang.Cond, row : Json) -> Bool {
 }
 
 ///|
-fn compare_cell(lhs : Json, op : @lang.CmpOp, rhs : Json) -> Bool {
-  let ordered = (pred : (Int) -> Bool) => {
+fn compare_cell(lhs : Json, op : CmpOp, rhs : Json) -> Bool {
+  let ordered = (pred : (Int32) -> Bool) => {
     (lhs, rhs) is ((Number(_, ..), Number(_, ..)) | (String(_), String(_))) &&
     pred(@table.compare(lhs, rhs))
   }
+  // Why not compare text case-insensitively: a view can be taken into a
+  // Nushell input, where these operators are case-sensitive.
   let text = (f : (String, String) -> Bool) => {
-    lhs is String(s) && rhs is String(t) && f(s.to_lower(), t.to_lower())
+    lhs is String(s) && rhs is String(t) && f(s, t)
   }
   match op {
     Eq => lhs == rhs
@@ -271,25 +268,34 @@ fn compare_cell(lhs : Json, op : @lang.CmpOp, rhs : Json) -> Bool {
     Le => ordered(c => c <= 0)
     Gt => ordered(c => c > 0)
     Ge => ordered(c => c >= 0)
-    Contains => contains_text(lhs, @table.cell_text(rhs).to_lower())
-    NotContains => !contains_text(lhs, @table.cell_text(rhs).to_lower())
+    Contains => contains_text(lhs, @table.cell_text(rhs))
+    NotContains => !contains_text(lhs, @table.cell_text(rhs))
     StartsWith => text((s, t) => s.has_prefix(t))
     EndsWith => text((s, t) => s.has_suffix(t))
   }
 }
 
 ///|
-fn contains_text(v : Json, needle : String) -> Bool {
-  match v {
-    Array(items) => items.iter().any(item => contains_text(item, needle))
-    Object(fields) => fields.values().any(f => contains_text(f, needle))
-    Null => false
-    _ => @table.cell_text(v).to_lower().contains(needle)
+fn contains_text(
+  v : Json,
+  needle : String,
+  ignore_case~ : Bool = false,
+) -> Bool {
+  let fold = (s : String) => if ignore_case { s.to_lower() } else { s }
+  let needle = fold(needle)
+  fn go(v : Json) -> Bool {
+    match v {
+      Array(items) => items.iter().any(go)
+      Object(fields) => fields.values().any(go)
+      Null => false
+      _ => fold(@table.cell_text(v)).contains(needle)
+    }
   }
+  go(v)
 }
 
 ///|
-fn math(op : @lang.MathOp, items : Array[Json]) -> Json raise CmdError {
+fn math(op : MathOp, items : Array[Json]) -> Json raise CmdError {
   let numbers = []
   for item in items {
     match item {
@@ -303,12 +309,12 @@ fn math(op : @lang.MathOp, items : Array[Json]) -> Json raise CmdError {
   }
   let sum = numbers.fold(init=0.0, (a, n) => a + n)
   if op is Sum {
-    return Json::number(sum)
+    return Json::Json(sum)
   }
   guard numbers is [first, ..] else {
     raise CmdError("math \{op.name()} on an empty list")
   }
-  Json::number(
+  Json::Json(
     match op {
       Min => numbers.fold(init=first, @cmp.minimum)
       Max => numbers.fold(init=first, @cmp.maximum)
@@ -363,5 +369,5 @@ fn match_pattern(pattern : String, line : String) -> Json? {
   if rest != "" || fields.is_empty() {
     return None
   }
-  Some(Json::object(fields))
+  Some(Json::Json(fields))
 }
