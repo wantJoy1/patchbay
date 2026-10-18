@@ -63,14 +63,51 @@ fn show_frame(frame : @app.Frame) -> Unit {
 }
 
 ///|
-fn unavailable_nushell(error : Error) -> @program.Program {
-  let name = "Nushell"
+fn unavailable(
+  name : String,
+  kind : @program.Kind,
+  error : Error,
+) -> @program.Program {
   {
     name,
-    kind: Interpreter(language="nu"),
+    kind,
     send: (_, _) => {
       raise @program.Failure("\{name} を起動できません: \{error}")
     },
+  }
+}
+
+///|
+/// Why not leave opencode its own tools: what it runs must go through
+/// patchbay to be drawn, so every built-in tool that reads, writes or runs
+/// anything is denied, leaving patchbay's tool.
+let opencode_config : Json = {
+  "permission": {
+    "bash": "deny",
+    "edit": "deny",
+    "read": "deny",
+    "glob": "deny",
+    "grep": "deny",
+    "list": "deny",
+    "task": "deny",
+    "skill": "deny",
+    "lsp": "deny",
+    "webfetch": "deny",
+    "websearch": "deny",
+  },
+}
+
+///|
+/// Why not wait for opencode however long it takes: the window stays blank
+/// until every program has started.
+async fn opencode(group : @async.TaskGroup[Unit]) -> @program.Program {
+  let name = "opencode"
+  @async.with_timeout(10000, () => {
+    @acp.agent(group, name~, command="opencode", args=["acp"], env={
+      "OPENCODE_CONFIG_CONTENT": opencode_config.stringify(),
+    })
+  }) catch {
+    e => unavailable(name, Agent, e)
   }
 }
 
@@ -80,8 +117,14 @@ async fn main {
   @async.set_external_event_loop(cocoa)
   open_window(@utf8.encode(page_html))
   @async.with_task_group(group => {
-    let nushell = @nushell.nushell(group) catch { e => unavailable_nushell(e) }
-    let app = @app.App::new([nushell, @mock.agent()], group, changed=show_frame)
+    let nushell = @nushell.nushell(group) catch {
+      e => unavailable("Nushell", Interpreter(language="nu"), e)
+    }
+    let app = @app.App::new(
+      [nushell, opencode(group)],
+      group,
+      changed=show_frame,
+    )
     for ;; {
       let message = @utf8.decode_lossy(cocoa.messages.get())
       let request : @app.Request = @json.from_json(@json.parse(message)) catch {

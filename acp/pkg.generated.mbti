@@ -1,0 +1,18 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "wantJoy1/patchbay/acp"
+
+import {
+  "moonbitlang/async",
+  "wantJoy1/patchbay/program",
+}
+
+// Values
+pub async fn agent(@async.TaskGroup[Unit], name~ : String, command~ : String, args~ : Array[String], env~ : Map[String, String]) -> @program.Program
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
