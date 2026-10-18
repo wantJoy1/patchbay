@@ -294,10 +294,12 @@ async test "attachments go with the next input" {
 }
 
 ///|
-async test "errors from the program are shown with the entry" {
+async test "errors from the program are shown with the entry and copy as text" {
   with_app(app => {
     send(app, "nope")
     assert_true(html(app).contains("unknown: nope"))
+    click(app, CopyText("unknown: nope"))
+    assert_eq(app.clipboard, "unknown: nope")
   })
 }
 

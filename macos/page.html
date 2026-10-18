@@ -72,6 +72,9 @@ button code { color: var(--accent); }
 .transform button { font-size: 12px; }
 
 .error { margin: 8px 0; padding: 8px 12px; border-radius: 8px; background: var(--danger-soft); color: var(--danger); font: 13px var(--mono); white-space: pre-wrap; }
+.error { display: flex; align-items: flex-start; gap: 8px; }
+.error span { flex: 1; }
+.error button { font: 12px var(--sans); }
 
 .table-wrap { width: fit-content; max-width: 100%; max-height: 60vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .grid { border-collapse: separate; border-spacing: 0; font-size: 13px; }

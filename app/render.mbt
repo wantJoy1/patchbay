@@ -200,12 +200,17 @@ fn App::render_output(self : App, output : Output) -> String {
     None
   }
   let blocks = output.blocks.map(b => self.render_block(b, adopt))
-  blocks.join("") + output.error.map(error_html).unwrap_or("")
+  blocks.join("") + output.error.map(e => self.error_html(e)).unwrap_or("")
 }
 
 ///|
-fn error_html(msg : String) -> String {
-  "<div class=\"error\" role=\"alert\">\{@html.escape(msg)}</div>"
+fn App::error_html(self : App, msg : String) -> String {
+  let copy = self.button(
+    "コピー",
+    CopyText(msg),
+    title="エラーをコピー",
+  )
+  "<div class=\"error\" role=\"alert\"><span>\{@html.escape(msg)}</span>\{copy}</div>"
 }
 
 ///|
@@ -324,7 +329,7 @@ fn App::render_transform(self : App, b : Int32, adopt : String?) -> String {
       )
     _ => ""
   }
-  let error = block.view_error.map(error_html).unwrap_or("")
+  let error = block.view_error.map(e => self.error_html(e)).unwrap_or("")
   "<div class=\"transform\"><span class=\"muted\">変換</span>\{body}\{toggle}\{adopt}</div>\{error}"
 }
 
