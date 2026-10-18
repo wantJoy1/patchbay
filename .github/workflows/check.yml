@@ -36,11 +36,11 @@ jobs:
           ~/.moon/bin/moon -C ~/.moon/lib/core bundle --warn-list -a --all
           ~/.moon/bin/moon update
           echo ~/.moon/bin >> "$GITHUB_PATH"
-      - name: nushell 0.115.0
+      - name: nushell 0.116.1
         run: |
-          name=nu-0.115.0-aarch64-apple-darwin
-          curl -fsSL -o nu.tar.gz "https://github.com/nushell/nushell/releases/download/0.115.0/$name.tar.gz"
-          echo "91f3c77e4f634b54029b07e3dc4e99ffec5fc0f98537f9b630bda32b4d06da5e  nu.tar.gz" | shasum -a 256 -c
+          name=nu-0.116.1-aarch64-apple-darwin
+          curl -fsSL -o nu.tar.gz "https://github.com/nushell/nushell/releases/download/0.116.1/$name.tar.gz"
+          echo "302fb3dfc5d44e7fe0d5b8227be8e75b4c3956ca8d4804234e5c68fbdd3e4917  nu.tar.gz" | shasum -a 256 -c
           tar xf nu.tar.gz -C "$RUNNER_TEMP"
           rm nu.tar.gz
           echo "$RUNNER_TEMP/$name" >> "$GITHUB_PATH"
