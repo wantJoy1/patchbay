@@ -2,7 +2,7 @@
 /// Why not other languages: everything builds with moon alone, and only the
 /// macOS window and the page need glue in their own languages.
 let glue : Array[String] = [
-  "macos/host.m", "macos/page.html", ".githooks/pre-commit", ".github/workflows/copilot-setup-steps.yml",
+  "macos/host.m", "macos/page.html", ".githooks/pre-commit",
 ]
 
 ///|
@@ -74,4 +74,16 @@ async test "the README has no heading but its title" {
     .map(l => l.to_owned())
     .collect()
   assert_eq(headings, ["# patchbay"])
+}
+
+///|
+/// Why not any author: a dependency's build can run its own commands and C
+/// code, so only owners whose code is trusted may appear, transitive ones
+/// included.
+async test "every dependency comes from a trusted owner" {
+  let (root, _) = files()
+  assert_eq(
+    @fs.readdir("\{root}/.mooncakes", include_hidden=false, sort=true),
+    ["moonbitlang"],
+  )
 }
