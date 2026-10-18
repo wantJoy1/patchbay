@@ -89,8 +89,7 @@ fn App::render_welcome(self : App) -> String {
     self.button(@html.escape(e), Send(e), class="chip")
   })
   (
-    $|<div class="welcome" data-key="w\{self.current}"><p>入力は選んだ処理系に送られます。表の見出しやセルを押すと、出力はそのままに表示だけを変換します。</p>
-    $|<div>\{chips.join("")}</div></div>
+    $|<div class="welcome" data-key="w\{self.current}">\{chips.join("")}</div>
   )
 }
 
@@ -106,13 +105,6 @@ fn App::render_entry(self : App, i : Int32, entry : Entry) -> String {
   let attachments = output.input.attachments.map(a => {
     "<span class=\"chip\">\{@html.escape(a.name)}</span>"
   })
-  let status = if entry.running {
-    "<span class=\"spinner\"></span>\{self.button("中断", Cancel(i), name="cancel")}"
-  } else if text != "" {
-    self.button("↺", UseInput(text), title="入力欄に戻す", name="input")
-  } else {
-    ""
-  }
   let markdown = output.parts.filter_map(p => {
     if p is Markdown(md) {
       Some(md)
@@ -120,16 +112,29 @@ fn App::render_entry(self : App, i : Int32, entry : Entry) -> String {
       None
     }
   })
-  let source = if markdown.is_empty() {
+  let copy = if markdown.is_empty() {
     ""
   } else {
-    "<footer>\{self.button("Markdown をコピー", CopyText(markdown.join("\n\n")), name="markdown")}</footer>"
+    self.button(
+      "コピー",
+      CopyText(markdown.join("\n\n")),
+      title="Markdown をコピー",
+      name="markdown",
+    )
+  }
+  let status = if entry.running {
+    "<span class=\"spinner\"></span>\{self.button("中断", Cancel(i), name="cancel")}"
+  } else if text != "" {
+    copy +
+    self.button("↺", UseInput(text), title="入力欄に戻す", name="input")
+  } else {
+    copy
   }
   let steps = entry.steps.mapi((s, step) => self.render_step(i, s, step))
   (
     $|<section class="turn" data-key="e\{i}"><header><span class="badge">\{@html.escape(program.name)}</span>
     $|<span class="said">\{said}</span>\{attachments.join("")}<span class="status">\{status}</span></header>
-    $|\{steps.join("")}\{self.render_output(output)}\{source}</section>
+    $|\{steps.join("")}\{self.render_output(output)}</section>
   )
 }
 

@@ -33,8 +33,7 @@ button code { color: var(--accent); }
 #out { flex: 1; overflow: auto; padding: 24px 16px 32px; }
 #out > * { max-width: var(--width); margin: 0 auto 32px; }
 
-.welcome { padding-top: 12vh; text-align: center; color: var(--muted); }
-.welcome div { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.welcome { padding-top: 24vh; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--fg); font-size: 12px; }
 .welcome .chip { padding: 4px 12px; font-size: 13px; }
 .chip button { padding: 0 6px; }
@@ -48,7 +47,6 @@ button code { color: var(--accent); }
 .turn:hover > header .status button, .spinner + button { visibility: visible; }
 .spinner { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.turn footer { margin-top: 4px; }
 
 .block { margin: 10px 0; }
 .block:not(.md) { width: fit-content; min-width: min(420px, 100%); max-width: 100%; }
@@ -137,8 +135,6 @@ button code { color: var(--accent); }
 #controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
 .compose-row { display: flex; align-items: flex-end; gap: 6px; }
 #input { flex: 1; min-width: 0; resize: none; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: inherit; font-size: 14px; line-height: 1.5; }
-.attach { padding: 7px 8px; color: var(--muted); border-radius: 8px; cursor: pointer; font-size: 13px; }
-.attach:hover { color: var(--fg); background: var(--sunken); }
 #send { padding: 7px 14px; border-radius: 10px; background: var(--accent); color: #fff; }
 #send:hover { filter: brightness(1.08); }
 #toast { position: fixed; bottom: 120px; left: 50%; transform: translate(-50%, 8px); opacity: 0; padding: 6px 12px; border-radius: 8px; background: var(--fg); color: var(--bg); font-size: 13px; pointer-events: none; transition: opacity 0.2s, transform 0.2s; }
@@ -150,8 +146,6 @@ button code { color: var(--accent); }
   <div id="controls"></div>
   <div class="compose-row">
     <textarea id="input" rows="1" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
-    <label class="attach" title="ファイルを添付">ファイル<input id="file" type="file" multiple hidden></label>
-    <label class="attach" title="フォルダを添付">フォルダ<input id="folder" type="file" webkitdirectory hidden></label>
     <button id="send">送信</button>
   </div>
 </footer>
@@ -324,9 +318,6 @@ async function attach(files) {
   }
   input.focus();
 }
-const named = (files, path) => [...files].map((file) => ({ file, name: path(file) }));
-document.getElementById("file").addEventListener("change", (e) => attach(named(e.target.files, (f) => f.name)));
-document.getElementById("folder").addEventListener("change", (e) => attach(named(e.target.files, (f) => f.webkitRelativePath)));
 
 async function entriesOf(entry, path = "") {
   if (entry.isFile) return [{ file: await new Promise((ok, ng) => entry.file(ok, ng)), name: path + entry.name }];
@@ -348,7 +339,7 @@ input.addEventListener("paste", (e) => {
   const images = [...e.clipboardData.files].filter((f) => f.type.startsWith("image/"));
   if (images.length) {
     e.preventDefault();
-    attach(named(images, (f) => f.name || "pasted.png"));
+    attach(images.map((file) => ({ file, name: file.name || "pasted.png" })));
   }
 });
 
