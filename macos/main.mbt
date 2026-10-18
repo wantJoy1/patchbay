@@ -71,6 +71,7 @@ fn unavailable(
   {
     name,
     kind,
+    settings: None,
     send: (_, _) => {
       raise @program.Failure("\{name} を起動できません: \{error}")
     },
@@ -100,14 +101,55 @@ let opencode_config : Json = {
 ///|
 /// Why not wait for opencode however long it takes: the window stays blank
 /// until every program has started.
-async fn opencode(group : @async.TaskGroup[Unit]) -> @program.Program {
+async fn opencode(
+  group : @async.TaskGroup[Unit],
+  interpreters : Array[@program.Program],
+) -> @program.Program {
   let name = "opencode"
   @async.with_timeout(10000, () => {
-    @acp.agent(group, name~, command="opencode", args=["acp"], env={
-      "OPENCODE_CONFIG_CONTENT": opencode_config.stringify(),
-    })
+    @acp.agent(
+      group,
+      name~,
+      command="opencode",
+      args=["acp"],
+      env={ "OPENCODE_CONFIG_CONTENT": opencode_config.stringify() },
+      interpreters=interpreters.map(p => (p.name, p.kind)),
+    )
   }) catch {
     e => unavailable(name, Agent, e)
+  }
+}
+
+///|
+/// Why not opencode's own configuration: the model and other settings are
+/// chosen in patchbay, and stay apart from how opencode is used elsewhere.
+let settings_dir : String = "\{@env.get_env_var("HOME").unwrap_or(".")}/Library/Application Support/patchbay"
+
+///|
+async fn read_settings() -> Map[String, Map[String, String]] {
+  let text = @fs.read_file("\{settings_dir}/settings.json").text() catch {
+    _ => return {}
+  }
+  @json.from_json(@json.parse(text)) catch {
+    _ => {}
+  }
+}
+
+///|
+/// Why not let each write run on its own: two writes would race, and an
+/// older one could land last.
+fn save_settings(
+  group : @async.TaskGroup[Unit],
+  lock : @async.Mutex,
+) -> (Map[String, Map[String, String]]) -> Unit {
+  chosen => {
+    let text = Json(chosen).stringify(indent=2)
+    group.spawn_bg(allow_failure=true, () => {
+      lock.acquire()
+      defer lock.release()
+      @fs.mkdir(settings_dir, recursive=true, allow_exist=true)
+      @fs.write_file("\{settings_dir}/settings.json", text)
+    })
   }
 }
 
@@ -121,9 +163,11 @@ async fn main {
       e => unavailable("Nushell", Interpreter(language="nu"), e)
     }
     let app = @app.App::new(
-      [nushell, opencode(group)],
+      [nushell, opencode(group, [nushell])],
       group,
       changed=show_frame,
+      chosen=read_settings(),
+      remember=save_settings(group, @async.Mutex()),
     )
     for ;; {
       let message = @utf8.decode_lossy(cocoa.messages.get())

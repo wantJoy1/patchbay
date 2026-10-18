@@ -4,6 +4,8 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/aqueue",
   "moonbitlang/async/external_loop_integration",
+  "moonbitlang/async/fs",
+  "moonbitlang/core/env",
   "wantJoy1/patchbay/acp",
   "wantJoy1/patchbay/nushell",
   "moonbitlang/core/json",

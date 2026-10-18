@@ -9,6 +9,7 @@ enum Layout {
 enum Menu {
   Cell(Int32, Int32, Int32)
   Copy(Int32)
+  Setting(Int32, String)
 } derive(Eq)
 
 ///|
@@ -32,6 +33,8 @@ enum UiAction {
   RemoveAttachment(Int32)
   Cancel(Int32)
   ToggleStep(Int32, Int32)
+  OpenSetting(Int32, String)
+  ChangeSetting(Int32, String, String)
 } derive(Eq, Debug)
 
 ///|
@@ -86,15 +89,24 @@ pub struct App {
   priv actions : Map[String, UiAction]
   priv mut scope : String
   priv mut next_act : Int32
+  priv chosen : Map[String, Map[String, String]]
+  priv remember : (Map[String, Map[String, String]]) -> Unit
 }
 
 ///|
+
+///|
+/// Why not keep the settings a program starts with: the user chose others
+/// before, and is to find them again. Why not keep a choice the program no
+/// longer offers: the program would refuse it.
 pub fn App::new(
   programs : Array[@program.Program],
   group : @async.TaskGroup[Unit],
   changed~ : (Frame) -> Unit,
+  chosen~ : Map[String, Map[String, String]] = {},
+  remember~ : (Map[String, Map[String, String]]) -> Unit = _ => (),
 ) -> App {
-  {
+  let app = {
     programs,
     group,
     changed,
@@ -114,7 +126,39 @@ pub fn App::new(
     actions: {},
     scope: "",
     next_act: 0,
+    chosen,
+    remember,
   }
+  for i, p in programs {
+    guard p.settings is Some(settings) && chosen.get(p.name) is Some(values) else {
+      continue
+    }
+    for setting in (settings.current)() {
+      if values.get(setting.id) is Some(value) &&
+        value != setting.value &&
+        setting.choices.iter().any(c => c.value == value) {
+        app.change_setting(i, setting.id, value)
+      }
+    }
+  }
+  app
+}
+
+///|
+fn App::change_setting(
+  self : App,
+  p : Int32,
+  id : String,
+  value : String,
+) -> Unit {
+  guard self.programs[p].settings is Some(settings) else { return }
+  self.group.spawn_bg(allow_failure=true, () => {
+    (settings.change)(id, value) catch {
+      e =>
+        self.notice = "\{self.programs[p].name} の設定を変えられません: \{e}"
+    }
+    self.notify()
+  })
 }
 
 ///|
@@ -309,6 +353,21 @@ fn App::dispatch(self : App, id : String, shift~ : Bool) -> Unit {
     }
     SetLayout(b, layout) => with_block(b, blk => blk.layout = layout)
     ShowAllRows(b) => with_block(b, blk => blk.show_all = true)
+    OpenSetting(p, id) =>
+      self.menu = if self.menu == Some(Setting(p, id)) {
+        None
+      } else {
+        Some(Setting(p, id))
+      }
+    ChangeSetting(p, id, value) => {
+      self.menu = None
+      let name = self.programs[p].name
+      let values = self.chosen.get(name).unwrap_or({})
+      values[id] = value
+      self.chosen[name] = values
+      (self.remember)(self.chosen)
+      self.change_setting(p, id, value)
+    }
     SelectProgram(i) => {
       self.current = i
       self.history_cursor = None

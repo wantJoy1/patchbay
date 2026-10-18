@@ -201,3 +201,34 @@ async test "the server answers the handshake and lists one tool over the interpr
     is Some({ "error": { "code": -32601, .. }, .. }),
   )
 }
+
+///|
+test "select options become settings, flattening groups and leaving booleans" {
+  assert_eq(
+    settings([
+      {
+        "id": "model",
+        "name": "Model",
+        "type": "select",
+        "currentValue": "a/x",
+        "options": [
+          { "value": "a/x", "name": "X" },
+          {
+            "group": "b",
+            "name": "B",
+            "options": [{ "value": "b/y", "name": "Y" }],
+          },
+        ],
+      },
+      { "id": "fast", "name": "Fast", "type": "boolean", "currentValue": true },
+    ]),
+    [
+      {
+        id: "model",
+        name: "Model",
+        value: "a/x",
+        choices: [{ value: "a/x", name: "X", }, { value: "b/y", name: "Y", }],
+      },
+    ],
+  )
+}

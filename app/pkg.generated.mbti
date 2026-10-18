@@ -17,7 +17,7 @@ pub struct App {
   // private fields
 }
 pub fn App::handle(Self, Request) -> Unit
-pub fn App::new(Array[@program.Program], @async.TaskGroup[Unit], changed~ : (Frame) -> Unit) -> Self
+pub fn App::new(Array[@program.Program], @async.TaskGroup[Unit], changed~ : (Frame) -> Unit, chosen? : Map[String, Map[String, String]], remember? : (Map[String, Map[String, String]]) -> Unit) -> Self
 
 pub struct Frame {
   html : String

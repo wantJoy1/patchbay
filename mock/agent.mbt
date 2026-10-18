@@ -4,6 +4,7 @@ pub fn agent() -> @program.Program {
   {
     name: "エージェント (モック)",
     kind: Agent,
+    settings: None,
     send: (input, session) => {
       turn += 1
       let emit = session.emit

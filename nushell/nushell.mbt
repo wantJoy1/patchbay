@@ -76,6 +76,7 @@ pub async fn nushell(group : @async.TaskGroup[Unit]) -> @program.Program {
   {
     name: "Nushell",
     kind: Interpreter(language="nu"),
+    settings: None,
     send: (input, session) => {
       guard input.attachments.is_empty() else {
         raise @program.Failure("Nushell には添付を渡せません")

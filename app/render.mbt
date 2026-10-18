@@ -58,13 +58,49 @@ fn App::render(self : App) -> (String, String) {
     let class = if i == self.current { "active" } else { "" }
     self.button(@html.escape(p.name), SelectProgram(i), class~)
   })
+  let settings = match self.programs[self.current].settings {
+    Some(settings) =>
+      (settings.current)().map(s => self.render_setting(self.current, s))
+    None => []
+  }
   let pending = self.pending.mapi((i, a) => {
     "<span class=\"chip\">\{@html.escape(a.name)}\{self.button("×", RemoveAttachment(i), title="添付を外す")}</span>"
   })
   (
     "<div>\{turns.join("")}</div>",
-    "<nav class=\"segmented\">\{programs.join("")}</nav>\{pending.join("")}",
+    "<nav class=\"segmented\">\{programs.join("")}</nav>\{settings.join("")}\{pending.join("")}",
   )
+}
+
+///|
+fn App::render_setting(
+  self : App,
+  p : Int32,
+  setting : @program.Setting,
+) -> String {
+  let label = match setting.choices.search_by(c => c.value == setting.value) {
+    Some(i) => setting.choices[i].name
+    None => setting.value
+  }
+  let menu = if self.menu == Some(Setting(p, setting.id)) {
+    let items = setting.choices.map(c => {
+      let mark = if c.value == setting.value { "✓ " } else { "" }
+      self.button(
+        "\{mark}\{@html.escape(c.name)}",
+        ChangeSetting(p, setting.id, c.value),
+        class="item",
+      )
+    })
+    "<div class=\"menu\">\{items.join("")}</div>"
+  } else {
+    ""
+  }
+  let open = self.button(
+    "\{@html.escape(label)} ▾",
+    OpenSetting(p, setting.id),
+    title=setting.name,
+  )
+  "<span class=\"split\">\{open}\{menu}</span>"
 }
 
 ///|

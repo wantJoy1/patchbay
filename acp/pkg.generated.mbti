@@ -7,7 +7,7 @@ import {
 }
 
 // Values
-pub async fn agent(@async.TaskGroup[Unit], name~ : String, command~ : String, args~ : Array[String], env~ : Map[String, String]) -> @program.Program
+pub async fn agent(@async.TaskGroup[Unit], name~ : String, command~ : String, args~ : Array[String], env~ : Map[String, String], interpreters~ : Array[(String, @program.Kind)]) -> @program.Program
 
 // Errors
 

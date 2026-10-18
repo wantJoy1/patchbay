@@ -232,7 +232,7 @@ window.patchbay = {
 
 // Why not position the menu in CSS: the scrolling table would clip it.
 function placeMenu() {
-  const menu = out.querySelector(".menu");
+  const menu = document.querySelector(".menu");
   if (!menu) return;
   const cell = menu.parentElement.getBoundingClientRect();
   const below = cell.bottom + menu.offsetHeight <= innerHeight;

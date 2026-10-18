@@ -6,6 +6,7 @@ async fn with_app(
   let fixture : @program.Program = {
     name: "fixture",
     kind: Interpreter(language="nu"),
+    settings: None,
     send: (input, session) => {
       match input.text {
         "users" => (session.emit)(Data(@fixture.users))
@@ -482,4 +483,79 @@ async test "a long fraction shows two decimals and keeps the full value" {
       html(app).contains(">3.11<"),
     )
   })
+}
+
+///|
+fn configurable(
+  model : Ref[String],
+  changes : Array[String],
+) -> @program.Program {
+  {
+    name: "agent",
+    kind: Agent,
+    send: (_, _) => (),
+    settings: Some({
+      current: () => {
+        [
+          {
+            id: "model",
+            name: "Model",
+            value: model.val,
+            choices: [
+              { value: "free", name: "Free", },
+              { value: "paid", name: "Paid", },
+            ],
+          },
+        ]
+      },
+      change: (_, value) => {
+        changes.push(value)
+        model.val = value
+      },
+    }),
+  }
+}
+
+///|
+async test "a setting is chosen from the controls and remembered" {
+  let model : Ref[String] = { val: "free", }
+  let changes = []
+  let saved = []
+  @async.with_task_group(group => {
+    let app = App::new([configurable(model, changes)], group, changed=_ => (), remember=c => {
+      saved.push(c.to_array())
+    })
+    assert_true(app.render().1.contains("Free ▾"))
+    click(app, OpenSetting(0, "model"))
+    assert_true(app.render().1.contains("✓ Free"))
+    click(app, ChangeSetting(0, "model", "paid"))
+    while changes.is_empty() {
+      @async.pause()
+    }
+    assert_eq(changes, ["paid"])
+    assert_eq(saved.length(), 1)
+    assert_true(
+      saved[0] is [("agent", values)] && values.get("model") == Some("paid"),
+    )
+    assert_true(
+      app.render().1.contains("Paid ▾") && !app.render().1.contains("menu"),
+    )
+  })
+}
+
+///|
+async test "a remembered setting is restored unless the program no longer offers it" {
+  let model : Ref[String] = { val: "free", }
+  let changes = []
+  @async.with_task_group(group => {
+    App::new([configurable(model, changes)], group, changed=_ => (), chosen={
+      "agent": { "model": "gone" },
+    })
+    |> ignore
+    App::new([configurable(model, changes)], group, changed=_ => (), chosen={
+      "agent": { "model": "paid" },
+    })
+    |> ignore
+  })
+  assert_eq(changes, ["paid"])
 }

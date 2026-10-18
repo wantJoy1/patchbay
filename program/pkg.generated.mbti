@@ -20,6 +20,11 @@ pub(all) struct Attachment {
 } derive(Eq, @debug.Debug)
 pub fn Attachment::is_text(Self) -> Bool
 
+pub(all) struct Choice {
+  value : String
+  name : String
+} derive(Eq, @debug.Debug)
+
 pub(all) struct Exchange {
   program : String
   input : Input
@@ -51,6 +56,7 @@ pub(all) struct Program {
   name : String
   kind : Kind
   send : async (Input, Session) -> Unit
+  settings : Settings?
 }
 
 pub(all) struct Reply {
@@ -63,6 +69,18 @@ pub(all) struct Session {
   programs : Array[(String, Kind)]
   emit : (Part) -> Unit
   run : async (String, Input) -> Reply
+}
+
+pub(all) struct Setting {
+  id : String
+  name : String
+  value : String
+  choices : Array[Choice]
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Settings {
+  current : () -> Array[Setting]
+  change : async (String, String) -> Unit
 }
 
 // Type aliases

@@ -67,10 +67,33 @@ pub(all) struct Session {
 }
 
 ///|
+pub(all) struct Choice {
+  value : String
+  name : String
+} derive(Eq, Debug)
+
+///|
+pub(all) struct Setting {
+  id : String
+  name : String
+  value : String
+  choices : Array[Choice]
+} derive(Eq, Debug)
+
+///|
+/// Why not a fixed list: a program can change its settings itself, as an
+/// agent falling back to another model does, so they are read when drawn.
+pub(all) struct Settings {
+  current : () -> Array[Setting]
+  change : async (String, String) -> Unit
+}
+
+///|
 /// Why not methods for the session: what carries over between inputs differs
 /// by program, so it stays in the closure behind `send`.
 pub(all) struct Program {
   name : String
   kind : Kind
   send : async (Input, Session) -> Unit
+  settings : Settings?
 }

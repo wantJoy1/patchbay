@@ -33,9 +33,8 @@ priv struct Agent {
   to_agent : @process.WriteToProcess
   responses : @aqueue.Queue[Json]
   mut id : Int32
-  mut session : String?
-  mut programs : Array[(String, @program.Kind)]
   mut turn : Turn?
+  mut options : Array[@program.Setting]
 }
 
 ///|
@@ -73,6 +72,18 @@ async fn Agent::read(
   while from_agent.read_until("\n") is Some(line) {
     let message = @json.parse(line) catch { _ => continue }
     match message {
+      {
+        "method": "session/update",
+        "params": {
+          "update": {
+            "sessionUpdate": "config_option_update",
+            "configOptions": options,
+            ..
+          },
+          ..
+        },
+        ..
+      } => self.options = settings(options)
       { "method": "session/update", "params": { "update": update, .. }, .. } =>
         if self.turn is Some(turn) {
           turn.update(update)
@@ -211,14 +222,50 @@ fn prompt(
 }
 
 ///|
+fn choices(options : Json) -> Array[@program.Choice] {
+  guard options is Array(options) else { return [] }
+  let flat = []
+  for option in options {
+    match option {
+      { "value": String(value), "name": String(name), .. } =>
+        flat.push(@program.Choice::{ value, name, })
+      { "options": inner, .. } => flat.append(choices(inner))
+      _ => ()
+    }
+  }
+  flat
+}
+
+///|
+/// Why not booleans too: the agent sends them only to clients that say they
+/// draw them, and patchbay does not.
+fn settings(options : Json) -> Array[@program.Setting] {
+  guard options is Array(options) else { return [] }
+  options.filter_map(o => {
+    match o {
+      {
+        "id": String(id),
+        "name": String(name),
+        "currentValue": String(value),
+        "options": list,
+        ..
+      } => Some(@program.Setting::{ id, name, value, choices: choices(list), })
+      _ => None
+    }
+  })
+}
+
+///|
 /// Why not spawn the agent for each input: its session and the context it
-/// has built would be lost.
+/// has built would be lost. Why not start the session at the first input:
+/// its settings, such as the model, are to be chosen before it.
 pub async fn agent(
   group : @async.TaskGroup[Unit],
   name~ : String,
   command~ : String,
   args~ : Array[String],
   env~ : Map[String, String],
+  interpreters~ : Array[(String, @program.Kind)],
 ) -> @program.Program {
   let (stdin, to_agent) = @process.write_to_process()
   let (from_agent, stdout) = @process.read_from_process()
@@ -237,9 +284,8 @@ pub async fn agent(
     to_agent,
     responses: @aqueue.Queue(kind=Unbounded),
     id: 0,
-    session: None,
-    programs: [],
     turn: None,
+    options: [],
   }
   group.spawn_bg(no_wait=true, () => agent.read(from_agent))
   agent.call("initialize", {
@@ -253,43 +299,37 @@ pub async fn agent(
   |> ignore
   let token = random_token()
   let port = serve(group, token, message => {
-    mcp(message, agent.programs, agent.turn)
+    mcp(message, interpreters, agent.turn)
   })
-  let cwd = @fs.realpath(".")
+  let created = agent.call("session/new", {
+    "cwd": Json(@fs.realpath(".")),
+    "mcpServers": [
+      {
+        "type": "http",
+        "name": "patchbay",
+        "url": Json("http://127.0.0.1:\{port}/mcp"),
+        "headers": [
+          { "name": "Authorization", "value": Json("Bearer \{token}") },
+        ],
+      },
+    ],
+  })
+  guard created is { "sessionId": String(id), .. } else {
+    raise @program.Failure(
+      "エージェントがセッションを作れません",
+    )
+  }
+  if created is { "configOptions": options, .. } {
+    agent.options = settings(options)
+  }
   let lock = @async.Mutex()
+  let mut first = true
   {
     name,
     kind: Agent,
     send: (input, session) => {
       lock.acquire()
       defer lock.release()
-      let first = agent.session is None
-      let id = match agent.session {
-        Some(id) => id
-        None => {
-          agent.programs = session.programs.filter(p => p.1 is Interpreter(_))
-          let created = agent.call("session/new", {
-            "cwd": Json(cwd),
-            "mcpServers": [
-              {
-                "type": "http",
-                "name": "patchbay",
-                "url": Json("http://127.0.0.1:\{port}/mcp"),
-                "headers": [
-                  { "name": "Authorization", "value": Json("Bearer \{token}") },
-                ],
-              },
-            ],
-          })
-          guard created is { "sessionId": String(id), .. } else {
-            raise @program.Failure(
-              "エージェントがセッションを作れません",
-            )
-          }
-          agent.session = Some(id)
-          id
-        }
-      }
       let turn = { session, text: StringBuilder(), }
       agent.turn = Some(turn)
       defer {
@@ -307,7 +347,23 @@ pub async fn agent(
         "prompt": prompt(input, session.unseen, first~),
       })
       |> ignore
+      first = false
       turn.flush()
     },
+    settings: Some({
+      current: () => agent.options,
+      change: (config, value) => {
+        lock.acquire()
+        defer lock.release()
+        let changed = agent.call("session/set_config_option", {
+          "sessionId": Json(id),
+          "configId": Json(config),
+          "value": Json(value),
+        })
+        if changed is { "configOptions": options, .. } {
+          agent.options = settings(options)
+        }
+      },
+    }),
   }
 }
