@@ -223,8 +223,8 @@ fn take(input : Json, n : Int32?, from_end~ : Bool) -> Json raise CmdError {
 fn lookup(v : Json, path : ArrayView[Seg]) -> Json? {
   match (path, v) {
     ([], _) => Some(v)
-    ([Idx(i), .. rest], _) =>
-      @table.index(v, i).bind(item => lookup(item, rest))
+    ([Idx(i), .. rest], Array(items)) =>
+      items.get(i).bind(item => lookup(item, rest))
     ([Key(k), .. rest], Object(fields)) =>
       fields.get(k).bind(item => lookup(item, rest))
     ([Key(_), ..], Array(items)) => {

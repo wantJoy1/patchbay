@@ -61,3 +61,17 @@ async test "every comment says why another way was not taken" {
   }
   assert_eq(offending, [])
 }
+
+///|
+/// Why not sections: the README holds only the problem and the ideal state;
+/// anything else can be derived from the code.
+async test "the README has no heading but its title" {
+  let (root, _) = files()
+  let headings = @fs.read_file("\{root}/README.mbt.md")
+    .text()
+    .split("\n")
+    .filter(l => l.has_prefix("#"))
+    .map(l => l.to_owned())
+    .collect()
+  assert_eq(headings, ["# patchbay"])
+}

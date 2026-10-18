@@ -85,13 +85,19 @@ test "errors point at the offending token" {
   assert_eq(
     [
       "frobnicate", "uniq |", "| uniq", "sort-by", "where age >=", "where age 3",
-      "uniq extra", "find \"x", "sort-by a --up", "from md", "where (a == 1",
+      "uniq extra", "find \"x", "sort-by a --up", "from md", "where (a == 1", "sort a",
+      "math median", "select", "first -1", "to xml", "get $x", "where a == [1", "where a == {b 1}",
+      "where a = 1",
     ].map(error),
     [
       "unknown command: frobnicate (at 0)", "expected a command (at 6)", "expected a command (at 0)",
       "sort-by needs a column (at 0)", "expected a value (at 12)", "expected a comparison operator (at 10)",
       "unexpected argument to uniq (at 5)", "unterminated string (at 5)", "unknown flag: --up (at 10)",
-      "cannot parse from this format (at 5)", "expected ')' (at 13)",
+      "cannot parse from this format (at 5)", "expected ')' (at 13)", "sort takes no column; use sort-by (at 5)",
+      "expected math sum, avg, min or max (at 0)", "select needs a column (at 6)",
+      "expected a count (at 6)", "expected a format: json, csv, tsv or md (at 3)",
+      "unknown variable: $x (at 4)", "unterminated list (at 13)", "expected ':' (at 15)",
+      "unexpected '=' (at 8)",
     ],
   )
 }

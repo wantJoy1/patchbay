@@ -34,9 +34,10 @@ test "where combines conditions, compares text case-sensitively and reads a miss
     results(users, [
       "where address.city == Tokyo | get id", "where tags =~ oncall | get id", "where name =~ A | get id",
       "where name =~ a and not active == true | get id", "where role == admin or age < 25 | get id",
-      "where name starts-with 佐 | get id", "where nope > 1",
+      "where name starts-with 佐 | get id", "where nope > 1", "where role != dev and age <= 30 | get id",
+      "where name !~ e and name ends-with k | get id",
     ]),
-    ["[1,3,6]", "[1,6]", "[1]", "[5,8]", "[1,5,8]", "[3]", "[]"],
+    ["[1,3,6]", "[1,6]", "[1]", "[5,8]", "[1,5,8]", "[3]", "[]", "[4,7]", "[8]"],
   )
   assert_eq(results([1, 5, 10], ["where $it > 3"]), ["[5,10]"])
 }
@@ -56,6 +57,19 @@ test "select, reject, get, first, last and skip pick parts of a value" {
   assert_eq(
     results(config, ["reject owners features server", "get owners.name"]),
     ["{\"name\":\"patchbay\",\"version\":\"0.1.0\"}", "[\"Alice\",\"Eve\"]"],
+  )
+}
+
+///|
+test "list commands reverse, deduplicate, count and name columns" {
+  assert_eq(
+    results(config, [
+      "length", "columns", "get owners | reverse | get name", "get features.export | uniq | length",
+    ]),
+    [
+      "5", "[\"name\",\"version\",\"server\",\"features\",\"owners\"]", "[\"Eve\",\"Alice\"]",
+      "3",
+    ],
   )
 }
 
@@ -105,7 +119,9 @@ test "errors name the failing stage" {
   assert_eq(results(users, ["lines", "get 99", "math sum"]), [
     "stage 1: lines expects text, got list", "stage 1: cannot find 99", "stage 1: math sum expects numbers, got record",
   ])
-  assert_eq(results([], ["first"]), ["stage 1: first on an empty list"])
+  assert_eq(results([], ["first", "math max"]), [
+    "stage 1: first on an empty list", "stage 1: math max on an empty list",
+  ])
   assert_true(
     results(log, ["from json"])[0].has_prefix("stage 1: invalid JSON"),
   )

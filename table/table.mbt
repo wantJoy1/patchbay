@@ -122,7 +122,7 @@ pub fn infer(s : String) -> Json {
 }
 
 ///|
-pub fn grid(v : Json) -> (Array[String], Array[Array[String]])? {
+fn grid(v : Json) -> (Array[String], Array[Array[String]])? {
   match v {
     Array(items) =>
       match columns(items) {

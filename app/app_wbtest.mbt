@@ -13,6 +13,7 @@ async fn with_app(
         "orders" => (session.emit)(Text(@fixture.orders_csv))
         "escape" => (session.emit)(Data([{ "a": "<x>" }]))
         "slow" => @async.sleep(60_000)
+        "many" => (session.emit)(Data(Json::Json(Array::makei(201, i => i))))
         text => raise @program.Failure("unknown: \{text}")
       }
     },
@@ -415,4 +416,25 @@ async test "frames follow the output as it arrives" {
     send(app, "表と図")
   })
   assert_true(frames.length() >= 2 && frames.last().unwrap().contains("<svg"))
+}
+
+///|
+async test "a long output shows its first rows until all are asked for" {
+  with_app(app => {
+    send(app, "many")
+    assert_true(html(app).contains("残り 1 行を表示"))
+    click(app, ShowAllRows(0))
+    assert_false(html(app).contains("残り"))
+  })
+}
+
+///|
+async test "the same value can be drawn as a table, a tree or JSON" {
+  with_app(app => {
+    send(app, "config")
+    click(app, SetLayout(0, Tree))
+    assert_true(html(app).contains("<div class=\"tree\">"))
+    click(app, SetLayout(0, Json))
+    assert_true(html(app).contains("&quot;name&quot;: &quot;patchbay&quot;"))
+  })
 }

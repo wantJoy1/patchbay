@@ -80,10 +80,9 @@ fn Parser::command(self : Parser) -> Command raise ParseError {
       SortBy(columns, reverse~)
     }
     "sort" => {
+      let err = self.error("sort takes no column; use sort-by")
       let (columns, reverse) = self.names_and_reverse()
-      guard columns.is_empty() else {
-        raise self.error("sort takes no column; use sort-by")
-      }
+      guard columns.is_empty() else { raise err }
       Sort(reverse~)
     }
     "where" => Where(self.cond())
@@ -224,13 +223,15 @@ fn path_of_word(w : StringView) -> Array[Seg] {
 
 ///|
 fn Parser::path(self : Parser) -> Array[Seg] raise ParseError {
+  let at = self.i
+  let error = msg => ParseError(pos=self.tokens[at].1, msg)
   match self.next() {
     Word(w) => path_of_word(w)
     Str(s) => [Key(s)]
     Num(n) if n == n.trunc() && n >= 0 => [Idx(n.to_int())]
     Var("it") => []
     Var(v) if v.has_prefix("it.") => path_of_word(v[3:])
-    Var(v) => raise self.error("unknown variable: $\{v}")
+    Var(v) => raise error("unknown variable: $\{v}")
     QPath(parts) => {
       let parts = if parts is [("$it", false), .. rest] {
         rest
@@ -238,14 +239,14 @@ fn Parser::path(self : Parser) -> Array[Seg] raise ParseError {
         parts[:]
       }
       if parts is [(v, false), ..] && v.has_prefix("$") {
-        raise self.error("unknown variable: \{v}")
+        raise error("unknown variable: \{v}")
       }
       parts
       .iter()
       .map(p => if p.1 { Seg::Key(p.0) } else { seg_of_piece(p.0) })
       .collect()
     }
-    _ => raise self.error("expected a cell path")
+    _ => raise error("expected a cell path")
   }
 }
 

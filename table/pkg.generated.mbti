@@ -10,8 +10,6 @@ pub fn compare(Json, Json) -> Int
 
 pub fn field(Json, String) -> Json?
 
-pub fn grid(Json) -> (Array[String], Array[Array[String]])?
-
 pub fn index(Json, Int) -> Json?
 
 pub fn infer(String) -> Json

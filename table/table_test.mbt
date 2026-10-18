@@ -77,13 +77,13 @@ test "tsv quotes less than csv" {
 }
 
 ///|
-test "grid of a list, a record and a scalar" {
-  assert_eq(@table.grid([1, "x"]), Some((["value"], [["1"], ["x"]])))
+test "a list of scalars has a value column, a record field and value columns" {
+  assert_eq(@table.to_markdown([1, "x"]), "| value |\n| --- |\n| 1 |\n| x |\n")
   assert_eq(
-    @table.grid({ "k": false }),
-    Some((["field", "value"], [["k", "false"]])),
+    @table.to_markdown({ "k": false }),
+    "| field | value |\n| --- | --- |\n| k | false |\n",
   )
-  assert_eq(@table.grid(1), None)
+  assert_eq(@table.to_markdown(1), "1")
 }
 
 ///|
