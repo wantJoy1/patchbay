@@ -1,0 +1,99 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "wantJoy1/patchbay/lang"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub let command_names : Array[String]
+
+pub fn parse(String) -> Array[Command] raise ParseError
+
+pub fn print(Array[Command]) -> String
+
+pub fn print_command(Command) -> String
+
+pub fn print_cond(Cond) -> String
+
+pub fn print_name(String) -> String
+
+pub fn print_path(Array[Seg]) -> String
+
+pub fn quote_string(String) -> String
+
+// Errors
+pub suberror ParseError {
+  ParseError(pos~ : Int, String)
+} derive(@debug.Debug)
+pub fn ParseError::message(Self) -> String
+
+// Types and methods
+pub(all) enum CmpOp {
+  Eq
+  Ne
+  Lt
+  Le
+  Gt
+  Ge
+  Contains
+  NotContains
+  StartsWith
+  EndsWith
+} derive(Eq, @debug.Debug)
+pub fn CmpOp::symbol(Self) -> String
+
+pub(all) enum Command {
+  SortBy(Array[String], reverse~ : Bool)
+  Sort(reverse~ : Bool)
+  Where(Cond)
+  Select(Array[String])
+  SelectRows(Array[Int])
+  Reject(Array[String])
+  Get(Array[Seg])
+  First(Int?)
+  Last(Int?)
+  Skip(Int)
+  Length
+  Reverse
+  Uniq
+  Columns
+  Lines
+  From(Format)
+  To(Format)
+  Math(MathOp)
+  Find(String)
+  Parse(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Cond {
+  Cmp(Array[Seg], CmpOp, Json)
+  And(Cond, Cond)
+  Or(Cond, Cond)
+  Not(Cond)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum Format {
+  Json
+  Csv
+  Tsv
+  Md
+} derive(Eq, @debug.Debug)
+pub fn Format::name(Self) -> String
+
+pub(all) enum MathOp {
+  Sum
+  Avg
+  Min
+  Max
+} derive(Eq, @debug.Debug)
+pub fn MathOp::name(Self) -> String
+
+pub(all) enum Seg {
+  Key(String)
+  Idx(Int)
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

@@ -1,0 +1,10 @@
+import {
+  "wantJoy1/patchbay/table",
+  "wantJoy1/patchbay/lang",
+  "moonbitlang/core/json",
+  "moonbitlang/core/cmp",
+}
+
+import {
+  "wantJoy1/patchbay/fixture",
+} for "test"

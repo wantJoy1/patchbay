@@ -1,0 +1,29 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "wantJoy1/patchbay/eval"
+
+import {
+  "moonbitlang/core/debug",
+  "wantJoy1/patchbay/lang",
+}
+
+// Values
+pub fn lookup(Json, ArrayView[@lang.Seg]) -> Json?
+
+pub fn run(Array[@lang.Command], Json) -> Json raise EvalError
+
+pub fn serialize(Json, @lang.Format) -> String
+
+pub fn test_cond(@lang.Cond, Json) -> Bool
+
+// Errors
+pub suberror EvalError {
+  EvalError(stage~ : Int, String)
+} derive(@debug.Debug)
+pub fn EvalError::message(Self) -> String
+pub fn EvalError::stage(Self) -> Int
+
+// Types and methods
+
+// Type aliases
+
+// Traits
