@@ -67,9 +67,10 @@ async test "every comment says why another way was not taken" {
 }
 
 ///|
-/// Why not sections: the README holds only the problem and the ideal state;
-/// anything else can be derived from the code.
-async test "the README has no heading but its title" {
+/// Why not any section: the README holds only the problem and the ideal state;
+/// anything else can be derived from the code, so a new section must first be
+/// judged to be part of the ideal state and listed here.
+async test "the README has only the listed sections" {
   let (root, _) = files()
   let headings = @fs.read_file("\{root}/README.mbt.md")
     .text()
@@ -77,7 +78,7 @@ async test "the README has no heading but its title" {
     .filter(l => l.has_prefix("#"))
     .map(l => l.to_owned())
     .collect()
-  assert_eq(headings, ["# patchbay"])
+  assert_eq(headings, ["# patchbay", "## 注意", "## 目標", "## 小目標"])
 }
 
 ///|
