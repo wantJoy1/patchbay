@@ -1,3 +1,6 @@
+> [!NOTE]
+> Claude Code Desktop や OpenCode Desktop などでほぼ充分そうなためアーカイブします
+
 # patchbay
 
 ## 注意
